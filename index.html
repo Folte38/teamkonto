@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Kasse</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+
+  <div class="logo-top">
+    <img src="logo.png" alt="Logo">
+  </div>
+
+  <button id="shotBtn" class="shot-btn">📸 Screenshot-Modus</button>
+
+  <div class="layout">
+
+    <div class="overlay">
+
+      <h1>💰 Team Kasse</h1>
+      <div id="statusLine" class="status"></div>
+
+      <div class="stats">
+        <div class="stat">
+          <span>Kontostand</span>
+          <strong id="balance"></strong>
+        </div>
+        <div class="stat">
+          <span>➕ Einnahmen</span>
+          <strong id="income"></strong>
+        </div>
+        <div class="stat">
+          <span>➖ Ausgaben</span>
+          <strong id="expenses"></strong>
+        </div>
+      </div>
+
+      <h2>➕ Einnahmen – Details</h2>
+      <ul class="list">
+        <li>Wochenbeiträge: <strong id="incContrib"></strong></li>
+        <li>Extra-Einnahmen: <strong id="incExtra"></strong></li>
+      </ul>
+
+      <h2>➕ Extra-Einnahmen</h2>
+      <div id="extraIncomeList" class="extras"></div>
+
+      <h2>👥 Spieler</h2>
+      <div id="players" class="players"></div>
+
+      <footer class="footer">
+        Team Kasse · Stand diese Woche
+      </footer>
+
+    </div>
+
+    <div class="goals">
+      <h2>🎯 Teamziele</h2>
+      <div id="goalsList"></div>
+    </div>
+
+  </div>
+</div>
+
+<script src="script-main.js"></script>
+</body>
+</html>
