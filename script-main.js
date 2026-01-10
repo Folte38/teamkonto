@@ -42,7 +42,7 @@ const data = {
     { name: "Folte38", paid: true },
     { name: "Slexx47", paid: true },
     { name: "TobiWanNoobie", paid: true },
-    { name: "leRqvenr", paid: true },
+    { name: "leRqven", paid: true },
     { name: "Gerry237", paid: true },
     { name: "Jerry237", paid: true },
     { name: "ObsiCK", paid: false },
@@ -153,6 +153,7 @@ document.getElementById("shotBtn").onclick = () => {
   const isShot = document.body.classList.contains("shot");
   renderStats(isShot);
 };
+
 
 
 
