@@ -26,7 +26,7 @@ const WEEK_LABEL = "Woche 1";
 
 const goals = [
   { name: "Bohrer V3", cost: 1000000000, current: 800000000 },
-  { name: "Phils Bauhacke", cost: 180000000, current: 50000000 }
+  { name: "Phils Bauhacke (Overpay)", cost: 205000000, current: 205000000 }
 ];
 
 // =========================
@@ -153,3 +153,4 @@ document.getElementById("shotBtn").onclick = () => {
   const isShot = document.body.classList.contains("shot");
   renderStats(isShot);
 };
+
