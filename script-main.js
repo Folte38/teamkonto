@@ -25,8 +25,8 @@ const WEEK_LABEL = "Woche 1";
 // =========================
 
 const goals = [
-  { name: "Bohrer V2", cost: 500000000, current: 0 },
-  { name: "Bohrer V2", cost: 500000000, current: 500000000 },
+  { name: "Bohrer V2", cost: 550000000, current: 200000000 },
+  { name: "Bohrer V2 (Erledigt)", cost: 550000000, current: 550000000 },
   { name: "Phils Bauhacke (Erledigt)", cost: 205000000, current: 205000000 }
 ];
 
@@ -154,6 +154,7 @@ document.getElementById("shotBtn").onclick = () => {
   const isShot = document.body.classList.contains("shot");
   renderStats(isShot);
 };
+
 
 
 
