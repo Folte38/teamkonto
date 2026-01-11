@@ -13,7 +13,7 @@ function formatMoney(value, screenshot = false) {
 }
 
 // =========================
-// WOCHENSTART
+// BASISDATEN
 // =========================
 
 const START_BALANCE = 0;
@@ -35,19 +35,30 @@ const goals = [
 // =========================
 
 const data = {
+
+  // Extra Einnahmen (wie bisher)
   extraIncome: [
     { type: "Spende", amount: 1000000, from: "Folte38", reason: "Spende" }
   ],
-  expenses: { projects: 0, shop: 0, losses: 0 },
+
+  // ✅ NEU: AUSGABEN ALS LISTE
+  expenses: [
+    {
+      type: "Projekt",
+      amount: 10000000,
+      reason: "Redstoneplot"
+    }
+  ],
+
   players: [
     { name: "Folte38", paid: true },
     { name: "Slexx47", paid: true },
     { name: "TobiWanNoobie", paid: true },
-    { name: "leRqven", paid: true },
+    { name: "LeRqvenrr", paid: true },
     { name: "Gerry237", paid: true },
     { name: "Jerry237", paid: true },
     { name: "ObsiCK", paid: true },
-    { name: "ImNotGoodSorry", paid: false }
+    { name: "ImNotGoodSorry", paid: true }
   ]
 };
 
@@ -62,22 +73,20 @@ const contributionIncome = paidPlayers.length * WEEKLY_CONTRIBUTION;
 const extraIncomeTotal = data.extraIncome.reduce((s, e) => s + e.amount, 0);
 const totalIncome = contributionIncome + extraIncomeTotal;
 
-const totalExpenses =
-  data.expenses.projects +
-  data.expenses.shop +
-  data.expenses.losses;
+// ✅ Ausgaben automatisch berechnen
+const totalExpenses = data.expenses.reduce((s, e) => s + e.amount, 0);
 
 const balance = START_BALANCE + totalIncome - totalExpenses;
 
 // =========================
-// STATUSZEILE
+// STATUS
 // =========================
 
 document.getElementById("statusLine").textContent =
   `${WEEK_LABEL} · ${paidPlayers.length} / ${data.players.length} Spieler bezahlt`;
 
 // =========================
-// STATS (INITIAL)
+// STATS
 // =========================
 
 function renderStats(isShot) {
@@ -108,7 +117,24 @@ data.extraIncome.forEach(e => {
 });
 
 // =========================
-// SPIELER (MIT KÖPFEN)
+// AUSGABEN (DETAILS + GRUND)
+// =========================
+
+const expenseList = document.getElementById("expenseList");
+expenseList.innerHTML = "";
+
+data.expenses.forEach(e => {
+  expenseList.innerHTML += `
+    <div class="extra">
+      <strong>- ${e.amount.toLocaleString()} $</strong>
+      – ${e.type}<br>
+      <span>${e.reason}</span>
+    </div>
+  `;
+});
+
+// =========================
+// SPIELER
 // =========================
 
 const playersEl = document.getElementById("players");
@@ -138,29 +164,16 @@ goals.forEach(g => {
       <strong>${g.name}</strong><br>
       <small>Ziel: ${g.cost.toLocaleString()} $</small><br>
       <small>Vorhanden: ${g.current.toLocaleString()} $</small>
-      <div class="progress">
-        <div style="width:${percent}%"></div>
-      </div>
+      <div class="progress"><div style="width:${percent}%"></div></div>
     </div>
   `;
 });
 
 // =========================
-// SCREENSHOT BUTTON (16:9)
+// SCREENSHOT BUTTON
 // =========================
 
 document.getElementById("shotBtn").onclick = () => {
   document.body.classList.toggle("shot");
-  const isShot = document.body.classList.contains("shot");
-  renderStats(isShot);
+  renderStats(document.body.classList.contains("shot"));
 };
-
-
-
-
-
-
-
-
-
-
