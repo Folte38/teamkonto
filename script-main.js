@@ -46,7 +46,7 @@ const data = {
     { name: "Folte38", paid: true },
     { name: "Slexx47", paid: false },
     { name: "TobiWanNoobie", paid: false },
-    { name: "LeRqvenrr", paid: false },
+    { name: "leRqven", paid: false },
     { name: "Gerry237", paid: false },
     { name: "Jerry237", paid: false },
     { name: "ObsiCK", paid: false },
@@ -207,4 +207,5 @@ if (shotBtn) {
     renderStats(document.body.classList.contains("shot"));
   };
 }
+
 
