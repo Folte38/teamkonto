@@ -16,9 +16,9 @@ function formatMoney(value, screenshot = false) {
 // BASISDATEN
 // =========================
 
-const START_BALANCE = 0;
+const START_BALANCE = 7000000;
 const WEEKLY_CONTRIBUTION = 2000000;
-const WEEK_LABEL = "Woche 1";
+const WEEK_LABEL = "Woche 2";
 
 // =========================
 // TEAMZIELE
@@ -42,23 +42,23 @@ const data = {
   ],
 
   // ✅ NEU: AUSGABEN ALS LISTE
-  expenses: [
-    {
-      type: "Projekt",
-      amount: 10000000,
-      reason: "Redstoneplot"
-    }
-  ],
+//  expenses: [
+//    {
+//      type: "Projekt",
+//      amount: 10000000,
+//      reason: "Redstoneplot"
+//    }
+//  ],
 
   players: [
-    { name: "Folte38", paid: true },
-    { name: "Slexx47", paid: true },
-    { name: "TobiWanNoobie", paid: true },
-    { name: "LeRqvenrr", paid: true },
-    { name: "Gerry237", paid: true },
-    { name: "Jerry237", paid: true },
-    { name: "ObsiCK", paid: true },
-    { name: "ImNotGoodSorry", paid: true }
+    { name: "Folte38", paid: false },
+    { name: "Slexx47", paid: false },
+    { name: "TobiWanNoobie", paid: false },
+    { name: "LeRqvenrr", paid: false },
+    { name: "Gerry237", paid: false },
+    { name: "Jerry237", paid: false },
+    { name: "ObsiCK", paid: false },
+    { name: "ImNotGoodSorry", paid: false }
   ]
 };
 
@@ -177,3 +177,4 @@ document.getElementById("shotBtn").onclick = () => {
   document.body.classList.toggle("shot");
   renderStats(document.body.classList.contains("shot"));
 };
+
