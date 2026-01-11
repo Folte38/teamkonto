@@ -26,7 +26,7 @@ const WEEK_LABEL = "Woche 2";
 
 const goals = [
   { name: "Bohrer V2", cost: 550000000, current: 200000000 },
-  { name: "Bohrer V2 (Erledigt)", cost: 550000000, current: 550000000 },
+  { name: "Bohrer V2 (noch nicht gekauft)", cost: 550000000, current: 550000000 },
   { name: "Phils Bauhacke (Erledigt)", cost: 205000000, current: 205000000 }
 ];
 
@@ -207,3 +207,4 @@ if (shotBtn) {
     renderStats(document.body.classList.contains("shot"));
   };
 }
+
