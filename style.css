@@ -855,46 +855,9 @@ body {
    STATUS
 ========================= */
 
-/* OFFEN */
-.credit-box.open::after {
-  content: "OFFEN";
-  background: rgba(255,255,255,0.12);
-  color: #ccc;
-}
-
-/* ANGENOMMEN */
-.credit-box.accepted::before {
-  background: #4caf50;
-}
-
-.credit-box.accepted::after {
-  content: "ANGENOMMEN";
-  background: rgba(76,175,80,0.25);
-  color: #a5d6a7;
-}
-
-/* ABGELEHNT */
-.credit-box.rejected::before {
-  background: #f44336;
-}
-
-.credit-box.rejected::after {
-  content: "ABGELEHNT";
-  background: rgba(244,67,54,0.25);
-  color: #ef9a9a;
-}
-/* ANGENOMMEN – Text heller */
-.credit-box.accepted::after {
-  content: "ANGENOMMEN";
-  background: rgba(76,175,80,0.25);
-  color: #e8f5e9; /* 👈 fast weiß, leicht grünlich */
-}
-
-/* ABGELEHNT – Text heller */
-.credit-box.rejected::after {
-  content: "ABGELEHNT";
-  background: rgba(244,67,54,0.25);
-  color: #ffebee; /* 👈 fast weiß, leicht rötlich */
+/* Status-Badge nur über .credit-status-badge Element steuern */
+.credit-box::after {
+  display: none; /* Pseudoelement ausblenden */
 }
 /* =========================
    KREDITANTRÄGE – TEXT WEISS
@@ -996,61 +959,9 @@ body {
   cursor: not-allowed;
 }
 
-/* Status-Badges - genau wie Teamziele */
+/* Status-Badges - nur über .credit-status-badge Element steuern */
 .credit-box::after {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  border-radius: 999px;
-  letter-spacing: .4px;
-  z-index: 2;
-  color: #fff;
-}
-
-/* OFFEN */
-.credit-box.open {
-  border: 2px solid rgba(255, 255, 255, 0.12);
-}
-
-.credit-box.open::after {
-  content: "OFFEN";
-  background: rgba(255,255,255,0.12);
-  color: #ccc;
-}
-
-/* ANGENOMMEN */
-.credit-box.accepted {
-  border: 2px solid #4caf50;
-  background: linear-gradient(
-    180deg,
-    rgba(76,175,80,.15),
-    rgba(76,175,80,.05)
-  );
-}
-
-.credit-box.accepted::after {
-  content: "ANGENOMMEN";
-  background: #4caf50;
-  color: #fff;
-}
-
-/* ABGELEHNT */
-.credit-box.rejected {
-  border: 2px solid #f44336;
-  background: linear-gradient(
-    180deg,
-    rgba(244,67,54,.15),
-    rgba(244,67,54,.05)
-  );
-}
-
-.credit-box.rejected::after {
-  content: "ABGELEHNT";
-  background: #f44336;
-  color: #fff;
+  display: none; /* Alle Pseudoelemente ausblenden */
 }
 
 /* Section Divider für Kredite */
@@ -1602,35 +1513,25 @@ body {
 /* Nein-Stimmen (von rechts) */
 .vote-no-bar {
   position: absolute;
-  right: 0;
+  left: 0;
   top: 0;
   height: 100%;
   background: linear-gradient(90deg, 
     rgba(244, 67, 54, 0.7), 
     rgba(244, 67, 54, 0.9));
-  transition: width 0.5s ease-out;
-  z-index: 1;
+  transition: width 0.5s ease-out, left 0.5s ease-out;
+  z-index: 0;
   box-shadow: inset 0 0 10px rgba(244, 67, 54, 0.3);
 }
 
-/* Text in der Progressbar */
+/* Text unter der Progressbar */
 .vote-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.8),
-    0 0 10px rgba(255, 255, 255, 0.2);
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #ddd;
+  text-align: center;
   z-index: 2;
-  letter-spacing: 0.5px;
-  padding: 2px 10px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 10px;
-  white-space: nowrap;
 }
 
 /* Container für die Abstimmungs-Buttons */
@@ -1909,6 +1810,20 @@ body {
   opacity: 0.7;
   font-size: 14px;
   color: #ddd;
+  margin-bottom: 22px;
+  transition: color 0.3s ease;
+}
+
+.status.status-red {
+  color: #f44336; /* Rot - niemand bezahlt */
+}
+
+.status.status-orange {
+  color: #ff9800; /* Orange - teilweise bezahlt */
+}
+
+.status.status-green {
+  color: #4caf50; /* Grün - alle bezahlt */
 }
 
 /* INFO-BOX */
@@ -1939,9 +1854,12 @@ body {
   background: rgba(15, 15, 15, 0.88);
   backdrop-filter: blur(10px);
   border-radius: 20px;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .active-credits-section h2 {
@@ -1952,42 +1870,80 @@ body {
 }
 
 .credit-list-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 500px;
-  overflow-y: auto;
-  padding-right: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 8px;
+  max-height: none;
+  overflow: visible;
+  align-content: start;
+  min-height: fit-content;
 }
 
-.credit-list-container::-webkit-scrollbar {
-  width: 6px;
+/* Flexibles Grid - passt sich der Anzahl der Anträge an */
+.credit-list-container:has(.credit-box:nth-child(1):nth-last-child(1)) {
+  grid-template-columns: 1fr;
 }
 
-.credit-list-container::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 10px;
+.credit-list-container:has(.credit-box:nth-child(1):nth-last-child(2)),
+.credit-list-container:has(.credit-box:nth-child(2):nth-last-child(1)) {
+  grid-template-columns: repeat(2, 1fr);
 }
 
-.credit-list-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
+.credit-list-container:has(.credit-box:nth-child(1):nth-last-child(3)),
+.credit-list-container:has(.credit-box:nth-child(2):nth-last-child(2)),
+.credit-list-container:has(.credit-box:nth-child(3):nth-last-child(1)) {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 768px) {
+  .credit-list-container {
+    grid-template-columns: 1fr !important;
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .credit-list-container {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
 }
 
 /* KREDIT-BOXEN */
 .credit-box {
-  background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
-  border-radius: 14px;
-  padding: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+  border-radius: 16px;
+  padding: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
   position: relative;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  height: 100%;
+}
+
+/* Größere Boxen wenn weniger Anträge vorhanden */
+.credit-list-container:has(.credit-box:nth-child(1):nth-last-child(1)) .credit-box,
+.credit-list-container:has(.credit-box:nth-child(1):nth-last-child(2)) .credit-box,
+.credit-list-container:has(.credit-box:nth-child(2):nth-last-child(1)) .credit-box {
+  min-height: 280px;
+  padding: 28px;
+}
+
+.credit-list-container:has(.credit-box:nth-child(1):nth-last-child(3)) .credit-box,
+.credit-list-container:has(.credit-box:nth-child(2):nth-last-child(2)) .credit-box,
+.credit-list-container:has(.credit-box:nth-child(3):nth-last-child(1)) .credit-box {
+  min-height: 250px;
+  padding: 26px;
 }
 
 .credit-box:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(180deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
 }
 
 .credit-box.open {
@@ -2012,8 +1968,9 @@ body {
 .credit-meta {
   font-size: 13px;
   color: #ddd;
-  line-height: 1.5;
-  margin-bottom: 12px;
+  line-height: 1.6;
+  margin-bottom: 16px;
+  flex: 1;
 }
 
 .credit-meta div {
@@ -2024,16 +1981,27 @@ body {
   color: #bbb;
 }
 
+.credit-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.credit-box-header h3 {
+  margin: 0;
+  flex: 1;
+  padding-right: 12px;
+}
+
 /* STATUS-BADGE */
 .credit-status-badge {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 11px;
   font-weight: 700;
   border-radius: 999px;
   letter-spacing: 0.3px;
+  flex-shrink: 0;
 }
 
 .credit-box.open .credit-status-badge {
@@ -2051,14 +2019,31 @@ body {
   color: #ef9a9a;
 }
 
-/* ABSTIMMUNGS-CONTAINER */
-.voting-container {
-  background: rgba(15, 15, 15, 0.88);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-top: 20px;
+/* VOTING MODAL */
+.voting-modal-content {
+  max-width: 500px;
+  width: 90%;
+}
+
+.voting-credit-info {
+  margin-bottom: 24px;
+}
+
+.voting-credit-info h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  color: #fff;
+  font-weight: 600;
+}
+
+.credit-reason-modal {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  color: #ddd;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .voting-container h2 {
@@ -2149,7 +2134,46 @@ body {
 
 /* PROGRESSBAR FÜR ABSTIMMUNG */
 .vote-progress-container {
-  margin: 16px 0;
+  margin: 20px 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.vote-progress-container .vote-text {
+  margin-top: 12px;
+  margin-bottom: 0;
+}
+
+.voting-progress {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #bbb;
+  text-align: center;
+}
+
+.voting-complete {
+  margin-top: 12px;
+  padding: 10px;
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+  color: #a5d6a7;
+  font-size: 13px;
+  text-align: center;
+  font-weight: 500;
+}
+
+.admin-wait-message {
+  padding: 12px;
+  background: rgba(255, 152, 0, 0.15);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 8px;
+  color: #ffb74d;
+  font-size: 13px;
+  text-align: center;
+  font-weight: 500;
+  margin-top: 12px;
 }
 
 .vote-progress {
@@ -2177,37 +2201,7 @@ body {
   box-shadow: inset 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
-.vote-no-bar {
-  position: absolute;
-  right: 0;
-  top: 0;
-  height: 100%;
-  background: linear-gradient(90deg, 
-    rgba(244, 67, 54, 0.7), 
-    rgba(244, 67, 54, 0.9));
-  transition: width 0.5s ease-out;
-  z-index: 1;
-  box-shadow: inset 0 0 10px rgba(244, 67, 54, 0.3);
-}
-
-.vote-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-  text-shadow: 
-    0 1px 3px rgba(0, 0, 0, 0.8),
-    0 0 10px rgba(255, 255, 255, 0.2);
-  z-index: 2;
-  letter-spacing: 0.5px;
-  padding: 3px 12px;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 10px;
-  white-space: nowrap;
-}
+/* Duplikat entfernt - wird weiter oben definiert */
 
 
 /* =========================
@@ -2603,15 +2597,232 @@ body {
 }
 
 /* Header für beide Container */
+.archive-header, .goals-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
 .archive h2, .goals h2 {
   font-size: 18px;
   font-weight: 600;
-  margin-bottom: 16px;
-  opacity: .9;
+  margin: 0;
+}
+
+.archive-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0; /* Verhindert, dass Header schrumpft */
+  justify-content: center;
+}
+
+.archive-add-btn:hover {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: rgba(76, 175, 80, 0.5);
+  transform: scale(1.1);
+}
+
+.goal-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(33, 150, 243, 0.2);
+  color: #2196f3;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.goal-add-btn:hover {
+  background: rgba(33, 150, 243, 0.3);
+  border-color: rgba(33, 150, 243, 0.5);
+  transform: scale(1.1);
+}
+
+.goal-delete-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.goal-delete-btn:hover {
+  background: rgba(244, 67, 54, 0.3);
+  border-color: rgba(244, 67, 54, 0.5);
+  transform: scale(1.1);
+}
+
+/* Neuer Teamziele Container mit grünem Rand */
+.goal-container {
+  background: rgba(15, 15, 15, 0.78);
+  border: 2px solid rgba(76, 175, 80, 0.3);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.goal-container:hover {
+  border-color: rgba(76, 175, 80, 0.5);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+/* Erstes Ziel nicht abschneiden */
+#goalsList .goal-container:first-child:hover {
+  transform: translateY(-1px);
+}
+
+.goal-container.done {
+  border-color: rgba(76, 175, 80, 0.6);
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.goal-details {
+  margin: 12px 0;
+  line-height: 1.6;
+}
+
+.goal-details small {
+  display: block;
+  margin-bottom: 4px;
+  color: #ccc;
+  font-size: 12px;
+}
+
+.goal-details strong {
+  color: #fff;
+}
+
+.progress-bar {
+  position: relative;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #66bb6a);
+  border-radius: 12px;
+  transition: width 0.5s ease;
+  position: relative;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.goal-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Formular-Row für Teamziele */
+.form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.form-row label {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 4px;
+}
+
+.form-row input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.form-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+}
+
+.form-row input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+  border: none;
+}
+
+.form-row span {
+  font-size: 14px;
+  color: #2196f3;
+  font-weight: bold;
+}
+
+.goal-edit-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(33, 150, 243, 0.3);
+  background: rgba(33, 150, 243, 0.2);
+  color: #2196f3;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 8px;
+}
+
+.goal-edit-btn:hover {
+  background: rgba(33, 150, 243, 0.3);
+  border-color: rgba(33, 150, 243, 0.5);
+  transform: scale(1.1);
 }
 
 /* Scrollbare Inhaltsbereiche */
@@ -2966,26 +3177,19 @@ body {
   transform: translateY(-2px);
 }
 
-/* Container für aktive Anträge - Fix für Abschneiden */
-.active-credits-section {
-  padding-top: 5px !important; /* Extra Platz oben */
-  padding-bottom: 5px !important; /* Extra Platz unten */
-}
-
-.credit-list-container {
-  padding: 5px 0; /* Padding für Hover-Effekt */
-}
+/* Entfernt - wird oben definiert */
 
 /* Status-Badge Position anpassen */
 .credit-status-badge {
   position: absolute;
-  top: -8px; /* Über der Box */
+  top: 12px; /* Innerhalb des Headers */
   right: 12px;
-  padding: 3px 10px;
+  padding: 6px 12px;
   font-size: 11px;
   font-weight: 700;
-  border-radius: 999px;
-  letter-spacing: 0.3px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   z-index: 10;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }

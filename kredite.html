@@ -126,47 +126,54 @@
     <h1>💳 Kreditanträge</h1>
 <div id="statusLine" class="status">
   Verwalte und beantrage Kredite für Teamprojekte. 
-  <strong>Neuer Prozess:</strong> Zuerst wird abgestimmt, dann entscheidet ein Admin über Annahme/Ablehnung.
-  Jedes Mitglied kann einmal pro Antrag abstimmen.
+  <strong>Demokratisches Voting:</strong> Alle Mitglieder müssen abstimmen. Bei vollständiger Abstimmung entscheidet die Mehrheit automatisch.
 </div>
   </div>
 
   <!-- AKTIVE ANTRÄGE -->
   <div class="active-credits-section">
-    <h2>📋 Aktive Anträge</h2>
+    <h2>📋 Kreditanträge</h2>
     <div id="creditList" class="credit-list-container"></div>
   </div>
 
-  <!-- ABSTIMMUNGS-CONTAINER (für ausgewählten Antrag) -->
-  <div id="votingContainer" class="voting-container" style="display: none;">
-    <h2>🗳️ Aktuelle Abstimmung</h2>
-    <div class="selected-credit-info">
-      <h3 id="selectedCreditPurpose"></h3>
-      <div class="credit-meta-small">
-        <div><strong>Kreditbetrag:</strong> <span id="selectedCreditAmount"></span> $</div>
-        <div><strong>Antragsteller:</strong> <span id="selectedCreditUser"></span></div>
+  <!-- VOTING MODAL -->
+  <div class="modal-overlay" id="votingModal" style="display: none;">
+    <div class="modal-content voting-modal-content">
+      <div class="modal-header">
+        <h2>🗳️ Abstimmung</h2>
+        <button class="modal-close" id="closeVotingModal">×</button>
       </div>
       
-      <!-- PROGRESSBAR -->
-      <div class="vote-progress-container">
-        <div class="vote-progress">
-          <div class="vote-yes-bar" style="width:0%"></div>
-          <div class="vote-no-bar" style="width:0%"></div>
-          <div class="vote-text">0 👍 | 0 👎 (0%)</div>
+      <div class="modal-body">
+        <div class="voting-credit-info">
+          <h3 id="selectedCreditPurpose"></h3>
+          <div class="credit-meta-small">
+            <div><strong>👤 Antragsteller:</strong> <span id="selectedCreditUser"></span></div>
+            <div><strong>💳 Kreditbetrag:</strong> <span id="selectedCreditAmount"></span> $</div>
+            <div><strong>💰 Gesamtpreis:</strong> <span id="selectedCreditTotal"></span> $</div>
+            <div><strong>📆 Rückzahlung:</strong> <span id="selectedCreditRepayment"></span></div>
+          </div>
+          
+          <div id="selectedCreditReason" class="credit-reason-modal" style="display: none;"></div>
         </div>
-      </div>
+        
+        <!-- STIMMEN ANZEIGE -->
+        <div class="vote-info-container">
+          <div class="vote-text" id="voteText">0 👍 | 0 👎 (0/0 haben abgestimmt)</div>
+        </div>
 
-      <!-- ABSTIMMUNGS-BUTTONS -->
-      <div class="voting-buttons">
-        <button id="voteYesBtn" class="vote-btn vote-yes-btn">
-          👍 Ja, dafür
-        </button>
-        <button id="voteNoBtn" class="vote-btn vote-no-btn">
-          👎 Nein, dagegen
-        </button>
+        <!-- ABSTIMMUNGS-BUTTONS -->
+        <div class="voting-buttons">
+          <button id="voteYesBtn" class="vote-btn vote-yes-btn">
+            👍 Ja, dafür
+          </button>
+          <button id="voteNoBtn" class="vote-btn vote-no-btn">
+            👎 Nein, dagegen
+          </button>
+        </div>
+        
+        <small class="vote-note">Deine Stimme wird sofort gezählt.</small>
       </div>
-      
-      <small class="vote-note">Deine Stimme wird sofort gezählt.</small>
     </div>
   </div>
 

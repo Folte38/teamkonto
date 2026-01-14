@@ -41,7 +41,10 @@
 
 <!-- ARCHIV -->
 <div class="archive">
-  <h2>🧾 Archiv</h2>
+  <div class="archive-header">
+    <h2>🧾 Archiv</h2>
+    <button id="archiveAddBtn" class="archive-add-btn" title="Neuer Eintrag">+</button>
+  </div>
   <div class="archive-content">
     <div id="archiveList"></div>
   </div>
@@ -76,24 +79,6 @@
         </div>
       </div>
 
-      <!-- NEUER EINTRAG (NUR FÜR ADMINS) -->
-      <div id="newEntrySection" style="display: none;">
-        <h2>✍️ Neuer Eintrag</h2>
-        <form id="paymentForm" class="card-form">
-          <select id="paymentType">
-            <option value="beitrag">Wochenbeitrag</option>
-            <option value="spende">Spende</option>
-            <option value="ausgabe">Ausgabe (Admin)</option>
-          </select>
-
-          <input id="paymentAmount" type="number" placeholder="Betrag">
-          <input id="paymentNote" type="text" placeholder="Kommentar">
-
-          <button type="submit">Eintragen</button>
-          <div id="paymentMsg"></div>
-        </form>
-      </div>
-
       <!-- SPIELER -->
       <h2>👥 Spieler</h2>
       <div id="players" class="players"></div>
@@ -107,9 +92,59 @@
 
 <!-- TEAMZIELE -->
 <div class="goals">
-  <h2>🎯 Teamziele</h2>
+  <div class="goals-header">
+    <h2>🎯 Teamziele</h2>
+    <button id="goalAddBtn" class="goal-add-btn" title="Neues Ziel" style="display: none;">+</button>
+  </div>
   <div class="goals-content">
     <div id="goalsList"></div>
+  </div>
+</div>
+
+<!-- ARCHIV EINTRAG MODAL -->
+<div class="modal-overlay" id="archiveModal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>✍️ Neuer Eintrag</h2>
+      <button class="modal-close" id="closeArchiveModal">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="archivePaymentForm" class="card-form">
+        <select id="archivePaymentType">
+          <option value="beitrag">Wochenbeitrag</option>
+          <option value="spende">Spende</option>
+          <option value="ausgabe" id="archiveAusgabeOption" style="display: none;">Ausgabe (Admin)</option>
+        </select>
+
+        <input id="archivePaymentAmount" type="number" placeholder="Betrag">
+        <input id="archivePaymentNote" type="text" placeholder="Kommentar">
+
+        <button type="submit">Eintragen</button>
+        <div id="archivePaymentMsg"></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- TEAMZIEL MODAL -->
+<div class="modal-overlay" id="goalModal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="goalModalTitle">🎯 Neues Teamziel</h2>
+      <button class="modal-close" id="closeGoalModal">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="goalForm" class="card-form">
+        <input id="goalName" type="text" placeholder="Zielname" required>
+        <input id="goalCost" type="number" placeholder="Kosten ($)" required>
+        <input id="goalCurrent" type="number" placeholder="Aktuelle Summe ($)" min="0" required>
+
+        <button type="submit" id="goalSubmitBtn">Ziel hinzufügen</button>
+        <div id="goalMsg"></div>
+      </form>
+    </div>
   </div>
 </div>
 

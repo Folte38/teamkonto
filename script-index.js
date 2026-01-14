@@ -32,12 +32,90 @@ let SELECTED_WEEK = CURRENT_WEEK;
 let IS_ADMIN = false;
 
 // =========================
-// TEAMZIELE (STATISCH)
+// TEAMZIELE (DYNAMISCH)
 // =========================
-const TEAM_GOALS = [
-  { name: "Bohrer V2", cost: 550000000, current: 200000000 },
-  { name: "Phils Bauhacke", cost: 205000000, current: 205000000 }
-];
+let EDITING_GOAL_ID = null; // ID des gerade bearbeiteten Ziels
+
+async function loadTeamGoals() {
+  console.log("🎯 loadTeamGoals() wurde aufgerufen!");
+  const goalsEl = document.getElementById("goalsList");
+  if (!goalsEl) {
+    console.error("❌ goalsList Element nicht gefunden!");
+    return;
+  }
+
+  console.log("✅ goalsList Element gefunden:", goalsEl);
+  goalsEl.innerHTML = '<div class="loading">Lade Ziele...</div>';
+
+  try {
+    console.log("Lade Teamziele aus Datenbank...");
+    
+    const { data: goals, error } = await window.supabaseClient
+      .from("team_goals")
+      .select("*")
+      .eq("is_active", true)
+      .order("created_at", { ascending: false });
+
+    console.log("Teamziele Ergebnis:", { goals, error });
+
+    if (error) {
+      console.error("Fehler beim Laden der Teamziele:", error);
+      goalsEl.innerHTML = `<div class="no-entries">Fehler: ${error.message}</div>`;
+      return;
+    }
+
+    if (!goals || goals.length === 0) {
+      console.log("Keine Teamziele gefunden");
+      goalsEl.innerHTML = '<div class="no-entries">Keine Teamziele gesetzt</div>';
+      return;
+    }
+
+    console.log(`${goals.length} Teamziele gefunden:`, goals);
+    goalsEl.innerHTML = "";
+
+    goals.forEach(goal => {
+      console.log("Verarbeite Ziel:", goal);
+      // Progress sicherstellen - falls null, 1 verwenden
+      const progress = goal.progress !== null ? goal.progress : 1;
+      const done = progress >= 100;
+      const percent = progress;
+
+      goalsEl.innerHTML += `
+        <div class="goal-container ${done ? "done" : ""}" data-goal-id="${goal.id}">
+          <div class="goal-header">
+            <strong>${goal.name}</strong>
+            ${done ? `<span class="goal-done">ABGESCHLOSSEN</span>` : ""}
+            ${IS_ADMIN ? `
+              <div class="goal-actions">
+                <button class="goal-edit-btn" onclick="editGoal('${goal.id}', '${goal.name}', ${goal.cost}, ${progress})" title="Bearbeiten">✏️</button>
+                <button class="goal-delete-btn" onclick="deleteGoal('${goal.id}')" title="Löschen">×</button>
+              </div>
+            ` : ""}
+          </div>
+
+          <div class="goal-details">
+            <small><strong>Ziel:</strong> ${goal.cost.toLocaleString()} $</small><br>
+            <small><strong>Aktuell:</strong> ${Math.round(goal.cost * progress / 100).toLocaleString()} $</small><br>
+            <small><strong>Benötigt:</strong> ${Math.max(0, goal.cost - Math.round(goal.cost * progress / 100)).toLocaleString()} $</small><br>
+            <small><strong>Fortschritt:</strong> ${percent}%</small><br>
+            <small><strong>Erstellt:</strong> ${new Date(goal.created_at).toLocaleDateString('de-DE')}</small>
+          </div>
+
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:${percent}%"></div>
+            <span class="progress-text">${percent}%</span>
+          </div>
+        </div>
+      `;
+    });
+    
+    console.log("✅ Teamziele erfolgreich geladen und angezeigt");
+    console.log("🎯 goalsList Inhalt nach Laden:", goalsEl.innerHTML);
+  } catch (error) {
+    console.error("Unerwarteter Fehler beim Laden der Teamziele:", error);
+    goalsEl.innerHTML = `<div class="error">Fehler: ${error.message}</div>`;
+  }
+}
 
 // =========================
 // PROFIL & NAV
@@ -66,21 +144,17 @@ async function loadProfile() {
     navUser.style.display = "flex";
   }
 
-  // "Neuer Eintrag" Sektion nur für Admins anzeigen
-  const newEntrySection = document.getElementById("newEntrySection");
-  if (newEntrySection) {
-    newEntrySection.style.display = IS_ADMIN ? "block" : "none";
-  }
-
-  // Ausgabe nur für Admins
+  // Ausgabe-Option nur für Admins anzeigen (nur noch im Archiv-Modal)
   setTimeout(() => {
-    const typeSelect = document.getElementById("paymentType");
-    if (!typeSelect) return;
-
-    if (!IS_ADMIN) {
-      [...typeSelect.options].forEach(opt => {
-        if (opt.value === "ausgabe") opt.remove();
-      });
+    const ausgabeOption = document.getElementById("ausgabeOption");
+    if (ausgabeOption) {
+      ausgabeOption.style.display = IS_ADMIN ? "block" : "none";
+    }
+    
+    // Teamziele-+Button nur für Admins anzeigen
+    const goalAddBtn = document.getElementById("goalAddBtn");
+    if (goalAddBtn) {
+      goalAddBtn.style.display = IS_ADMIN ? "flex" : "none";
     }
   }, 0);
 }
@@ -247,8 +321,21 @@ async function loadPlayerPaymentStatus() {
     });
 
     const paidCount = profiles.filter(p => (sums[p.id] || 0) >= WEEKLY_CONTRIBUTION).length;
-    document.getElementById("statusLine").innerText =
-      `${SELECTED_WEEK} · ${paidCount} / ${profiles.length} Spieler bezahlt`;
+    const totalCount = profiles.length;
+    
+    // Status-Farbe basierend auf Anzahl der bezahlenden Spieler
+    let statusClass = "";
+    if (paidCount === 0) {
+      statusClass = "status-red"; // Niemand bezahlt
+    } else if (paidCount < totalCount) {
+      statusClass = "status-orange"; // Teilweise bezahlt
+    } else {
+      statusClass = "status-green"; // Alle bezahlt
+    }
+    
+    const statusLine = document.getElementById("statusLine");
+    statusLine.innerText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+    statusLine.className = `status ${statusClass}`;
     
     // FOOTER AKTUALISIEREN - WICHTIG!
     if (footer) {
@@ -264,41 +351,6 @@ async function loadPlayerPaymentStatus() {
       footer.textContent = `Team Kasse · Stand diese Woche · Fehler aufgetreten`;
     }
   }
-}
-
-// =========================
-// TEAMZIELE
-// =========================
-function loadTeamGoals() {
-  const goalsEl = document.getElementById("goalsList");
-  if (!goalsEl) return;
-
-  goalsEl.innerHTML = "";
-
-  const openGoals = TEAM_GOALS.filter(g => g.current < g.cost);
-  const doneGoals = TEAM_GOALS.filter(g => g.current >= g.cost);
-  const sortedGoals = [...openGoals, ...doneGoals].slice(0, 10);
-
-  sortedGoals.forEach(goal => {
-    const done = goal.current >= goal.cost;
-    const percent = Math.min((goal.current / goal.cost) * 100, 100);
-
-    goalsEl.innerHTML += `
-      <div class="goal ${done ? "done" : ""}">
-        <div class="goal-header">
-          <strong>${goal.name}</strong>
-          ${done ? `<span class="goal-done">ERLEDIGT</span>` : ""}
-        </div>
-
-        <small>Ziel: ${goal.cost.toLocaleString()} $</small><br>
-        <small>Aktuell: ${goal.current.toLocaleString()} $</small>
-
-        <div class="progress">
-          <div style="width:${percent}%"></div>
-        </div>
-      </div>
-    `;
-  });
 }
 
 // =========================
@@ -362,75 +414,324 @@ async function loadArchive() {
 }
 
 // =========================
-// FORMULAR (NUR NOTE-FIX)
+// ARCHIV MODAL FUNKTIONEN
 // =========================
-const paymentForm = document.getElementById("paymentForm");
-const paymentMsg = document.getElementById("paymentMsg");
-
-if (paymentForm) {
-  paymentForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    const type = document.getElementById("paymentType").value;
-    const amount = parseInt(document.getElementById("paymentAmount").value);
-
-    const note =
-      type === "beitrag"
-        ? null
-        : document.getElementById("paymentNote").value;
-
-    if (!amount || amount <= 0) {
-      paymentMsg.innerText = "Bitte gültigen Betrag eingeben";
-      return;
-    }
-
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-
-    const { error } = await window.supabaseClient
-      .from("payments")
-      .insert([{
-        user_id: user.id,
-        type,
-        amount,
-        note,
-        week: SELECTED_WEEK || CURRENT_WEEK
-      }]);
-
-    if (error) {
-      paymentMsg.innerText = error.message;
-    } else {
-      paymentMsg.innerText = "✅ Eintrag gespeichert";
-      paymentForm.reset();
-      loadPaymentsFromDB();
-      loadPlayerPaymentStatus();
-      loadArchive();
-    }
-  });
-}
-
-// =========================
-// KOMMENTAR SICHTBARKEIT
-// =========================
-const paymentTypeSelect = document.getElementById("paymentType");
-const paymentNoteInput = document.getElementById("paymentNote");
-
-if (paymentTypeSelect && paymentNoteInput) {
-  function updateNoteVisibility() {
-    const type = paymentTypeSelect.value;
-
-    if (type === "spende" || type === "ausgabe") {
-      paymentNoteInput.style.display = "block";
-    } else {
-      paymentNoteInput.style.display = "none";
-      paymentNoteInput.value = "";
+function showArchiveModal() {
+  const modal = document.getElementById("archiveModal");
+  if (modal) {
+    modal.style.display = "flex";
+    
+    // Admin-Option anzeigen/ausblenden
+    const ausgabeOption = document.getElementById("archiveAusgabeOption");
+    if (ausgabeOption) {
+      ausgabeOption.style.display = IS_ADMIN ? "block" : "none";
     }
   }
-
-  paymentTypeSelect.addEventListener("change", updateNoteVisibility);
-  updateNoteVisibility();
 }
 
+function hideArchiveModal() {
+  const modal = document.getElementById("archiveModal");
+  if (modal) {
+    modal.style.display = "none";
+    document.getElementById("archivePaymentForm").reset();
+    document.getElementById("archivePaymentMsg").innerText = "";
+  }
+}
+
+// Archiv-Modal Event Listener
+document.addEventListener("DOMContentLoaded", () => {
+  // Archiv-+Button
+  const archiveAddBtn = document.getElementById("archiveAddBtn");
+  if (archiveAddBtn) {
+    archiveAddBtn.addEventListener("click", showArchiveModal);
+  }
+  
+  // Modal schließen
+  const closeArchiveModal = document.getElementById("closeArchiveModal");
+  if (closeArchiveModal) {
+    closeArchiveModal.addEventListener("click", hideArchiveModal);
+  }
+  
+  // Modal klick außerhalb schließen
+  const archiveModal = document.getElementById("archiveModal");
+  if (archiveModal) {
+    archiveModal.addEventListener("click", (e) => {
+      if (e.target === archiveModal) {
+        hideArchiveModal();
+      }
+    });
+  }
+  
+  // ESC-Taste zum Schließen
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      hideArchiveModal();
+    }
+  });
+});
+
+// Archiv-Formular absenden
+document.addEventListener("DOMContentLoaded", () => {
+  const archivePaymentForm = document.getElementById("archivePaymentForm");
+  if (archivePaymentForm) {
+    archivePaymentForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const type = document.getElementById("archivePaymentType").value;
+      const amount = parseInt(document.getElementById("archivePaymentAmount").value);
+      const note = document.getElementById("archivePaymentNote").value;
+      const archivePaymentMsg = document.getElementById("archivePaymentMsg");
+
+      if (!amount || amount <= 0) {
+        archivePaymentMsg.innerText = "❌ Bitte gültigen Betrag eingeben";
+        return;
+      }
+
+      const { error } = await window.supabaseClient
+        .from("payments")
+        .insert([{
+          user_id: user.id,
+          type,
+          amount,
+          note,
+          week: SELECTED_WEEK || CURRENT_WEEK
+        }]);
+
+      if (error) {
+        archivePaymentMsg.innerText = error.message;
+      } else {
+        archivePaymentMsg.innerText = "✅ Eintrag gespeichert";
+        archivePaymentForm.reset();
+        loadPaymentsFromDB();
+        loadPlayerPaymentStatus();
+        loadArchive();
+        
+        // Modal nach 1 Sekunde schließen
+        setTimeout(() => {
+          hideArchiveModal();
+        }, 1000);
+      }
+    });
+  }
+  
+  // Kommentar-Sichtbarkeit für Archiv-Formular
+  const archivePaymentTypeSelect = document.getElementById("archivePaymentType");
+  const archivePaymentNoteInput = document.getElementById("archivePaymentNote");
+
+  if (archivePaymentTypeSelect && archivePaymentNoteInput) {
+    function updateArchiveNoteVisibility() {
+      const type = archivePaymentTypeSelect.value;
+
+      if (type === "spende" || type === "ausgabe") {
+        archivePaymentNoteInput.style.display = "block";
+      } else {
+        archivePaymentNoteInput.style.display = "none";
+        archivePaymentNoteInput.value = "";
+      }
+    }
+
+    archivePaymentTypeSelect.addEventListener("change", updateArchiveNoteVisibility);
+    updateArchiveNoteVisibility();
+  }
+});
+
 // =========================
+// TEAMZIELE MODAL FUNKTIONEN
+// =========================
+function showGoalModal() {
+  const modal = document.getElementById("goalModal");
+  if (modal) {
+    modal.style.display = "flex";
+    // Formular zurücksetzen für neues Ziel
+    resetGoalForm();
+  }
+}
+
+function hideGoalModal() {
+  const modal = document.getElementById("goalModal");
+  if (modal) {
+    modal.style.display = "none";
+    resetGoalForm();
+  }
+}
+
+function resetGoalForm() {
+  EDITING_GOAL_ID = null;
+  document.getElementById("goalForm").reset();
+  document.getElementById("goalModalTitle").textContent = " Neues Teamziel";
+  document.getElementById("goalSubmitBtn").textContent = "Ziel hinzufügen";
+  document.getElementById("goalMsg").innerText = "";
+}
+
+// Ziel bearbeiten
+function editGoal(goalId, name, cost, progress) {
+  EDITING_GOAL_ID = goalId;
+  
+  const modal = document.getElementById("goalModal");
+  document.getElementById("goalModalTitle").textContent = " Teamziel bearbeiten";
+  document.getElementById("goalSubmitBtn").textContent = "Ziel aktualisieren";
+  document.getElementById("goalName").value = name;
+  document.getElementById("goalCost").value = cost;
+  
+  // Aktuelle Summe berechnen und eintragen
+  const currentAmount = Math.round(cost * progress / 100);
+  document.getElementById("goalCurrent").value = currentAmount;
+  
+  modal.style.display = "flex";
+}
+
+// Ziel löschen (vollständig aus Datenbank)
+async function deleteGoal(goalId) {
+  console.log("🗑️ Lösche Ziel:", goalId);
+  if (!confirm("Möchtest du dieses Ziel wirklich endgültig löschen?")) {
+    console.log("❌ Löschen abgebrochen");
+    return;
+  }
+  
+  try {
+    console.log("🗑️ Starte Löschen aus Datenbank...");
+    const { error } = await window.supabaseClient
+      .from("team_goals")
+      .delete()
+      .eq("id", goalId);
+      
+    console.log("🗑️ Delete Ergebnis:", { error });
+      
+    if (error) {
+      console.error("❌ Fehler beim Löschen:", error);
+      alert("Fehler beim Löschen: " + error.message);
+    } else {
+      console.log("✅ Ziel erfolgreich gelöschen!");
+      alert("Ziel wurde erfolgreich gelöscht!");
+      loadTeamGoals(); // Ziele neu laden
+    }
+  } catch (error) {
+    console.error("❌ Unerwarteter Fehler beim Löschen:", error);
+    alert("Fehler beim Löschen: " + error.message);
+  }
+}
+
+// Teamziele-Modal Event Listener
+document.addEventListener("DOMContentLoaded", () => {
+  // Teamziele-+Button
+  const goalAddBtn = document.getElementById("goalAddBtn");
+  if (goalAddBtn) {
+    goalAddBtn.addEventListener("click", showGoalModal);
+  }
+  
+  // Modal schließen
+  const closeGoalModal = document.getElementById("closeGoalModal");
+  if (closeGoalModal) {
+    closeGoalModal.addEventListener("click", hideGoalModal);
+  }
+  
+  // Modal klick außerhalb schließen
+  const goalModal = document.getElementById("goalModal");
+  if (goalModal) {
+    goalModal.addEventListener("click", (e) => {
+      if (e.target === goalModal) {
+        hideGoalModal();
+      }
+    });
+  }
+  
+  // ESC-Taste zum Schließen
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      hideGoalModal();
+    }
+  });
+});
+
+// Teamziele-Formular absenden
+document.addEventListener("DOMContentLoaded", () => {
+  const goalForm = document.getElementById("goalForm");
+  if (goalForm) {
+    goalForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const name = document.getElementById("goalName").value;
+      const cost = parseInt(document.getElementById("goalCost").value);
+      const current = parseInt(document.getElementById("goalCurrent").value) || 0;
+      
+      // Fortschritt aus aktueller Summe berechnen
+      const progress = Math.min(Math.max(Math.round((current / cost) * 100), 1), 100);
+      
+      const goalMsg = document.getElementById("goalMsg");
+
+      if (!name || !cost || cost <= 0) {
+        goalMsg.innerText = " Bitte alle Felder ausfüllen";
+        return;
+      }
+
+      let result;
+      if (EDITING_GOAL_ID) {
+        // Bestehendes Ziel aktualisieren
+        console.log("Aktualisiere Ziel:", EDITING_GOAL_ID, { name, cost, progress, current });
+        result = await window.supabaseClient
+          .from("team_goals")
+          .update({
+            name,
+            cost,
+            progress
+          })
+          .eq("id", EDITING_GOAL_ID);
+          
+        if (!result.error) {
+          console.log("Ziel erfolgreich aktualisiert");
+          goalMsg.innerText = "✅ Ziel aktualisiert";
+        }
+      } else {
+        // Neues Ziel erstellen
+        console.log("Erstelle neues Ziel:", { name, cost, progress, current, userId: user.id });
+        result = await window.supabaseClient
+          .from("team_goals")
+          .insert([{
+            name,
+            cost,
+            progress,
+            created_by: user.id,
+            is_active: true
+          }]);
+          
+        if (!result.error) {
+          console.log("Ziel erfolgreich erstellt:", result.data);
+          goalMsg.innerText = "✅ Ziel hinzugefügt";
+        }
+      }
+
+      console.log("Ergebnis:", result);
+      
+      if (result.error) {
+        console.error("Fehler beim Speichern:", result.error);
+        goalMsg.innerText = result.error.message;
+      } else {
+        goalForm.reset();
+        console.log("Lade Teamziele neu...");
+        
+        // WICHTIG: Explizit warten und neu laden
+        setTimeout(async () => {
+          console.log(" Erzwinge Neuladen der Teamziele...");
+          await loadTeamGoals();
+          console.log("✅ Teamziele neu geladen");
+        }, 100);
+        
+        // Modal nach 1 Sekunde schließen
+        setTimeout(() => {
+          hideGoalModal();
+        }, 1000);
+      }
+    });
+  }
+});
+
+// ... (rest of the code remains the same)
 // LOGIN-BENACHRICHTIGUNG (verwendet globale Funktionen)
 // =========================
 // Die Login-Benachrichtigungen werden jetzt über notifications.js verwaltet
@@ -439,12 +740,27 @@ if (paymentTypeSelect && paymentNoteInput) {
 // INIT - ORIGINAL VERSION
 // =========================
 document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🚀 INIT wird ausgeführt...");
+  
   await loadProfile();
+  console.log("✅ loadProfile abgeschlossen");
+  
   await loadWeeks();
+  console.log("✅ loadWeeks abgeschlossen");
+  
   loadPaymentsFromDB();
+  console.log("✅ loadPaymentsFromDB abgeschlossen");
+  
   loadPlayerPaymentStatus();
+  console.log("✅ loadPlayerPaymentStatus abgeschlossen");
+  
   loadTeamGoals();
+  console.log("✅ loadTeamGoals aufgerufen");
+  
   loadArchive();
+  console.log("✅ loadArchive abgeschlossen");
+  
+  console.log("🎯 Alle Initialisierungen abgeschlossen!");
   
   // Login-Benachrichtigung wird automatisch über notifications.js gesendet
 });
