@@ -66,6 +66,12 @@ async function loadProfile() {
     navUser.style.display = "flex";
   }
 
+  // "Neuer Eintrag" Sektion nur für Admins anzeigen
+  const newEntrySection = document.getElementById("newEntrySection");
+  if (newEntrySection) {
+    newEntrySection.style.display = IS_ADMIN ? "block" : "none";
+  }
+
   // Ausgabe nur für Admins
   setTimeout(() => {
     const typeSelect = document.getElementById("paymentType");
@@ -425,6 +431,11 @@ if (paymentTypeSelect && paymentNoteInput) {
 }
 
 // =========================
+// LOGIN-BENACHRICHTIGUNG (verwendet globale Funktionen)
+// =========================
+// Die Login-Benachrichtigungen werden jetzt über notifications.js verwaltet
+
+// =========================
 // INIT - ORIGINAL VERSION
 // =========================
 document.addEventListener("DOMContentLoaded", async () => {
@@ -434,4 +445,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   loadPlayerPaymentStatus();
   loadTeamGoals();
   loadArchive();
+  
+  // Login-Benachrichtigung wird automatisch über notifications.js gesendet
 });

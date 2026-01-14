@@ -526,15 +526,28 @@ async function toggleItem(itemId) {
     .eq("user_id", CURRENT_USER_ID)
     .maybeSingle();
 
+  // Item-Name für Benachrichtigung laden
+  const { data: item } = await window.supabaseClient
+    .from("team_items")
+    .select("name")
+    .eq("id", itemId)
+    .single();
+
   if (existing) {
+    // Item zurücklegen
     await window.supabaseClient
       .from("team_item_usage")
       .delete()
       .eq("id", existing.id);
+    
+    // Benachrichtigung wird automatisch über Realtime ausgelöst
   } else {
+    // Item ausleihen
     await window.supabaseClient
       .from("team_item_usage")
       .insert([{ item_id: itemId, user_id: CURRENT_USER_ID }]);
+    
+    // Benachrichtigung wird automatisch über Realtime ausgelöst
   }
 
   setTimeout(loadTeamItems, 200);
@@ -1206,6 +1219,11 @@ function addCustomStyles() {
 }
 
 // =========================
+// LOGIN-BENACHRICHTIGUNGEN (werden über notifications.js verwaltet)
+// =========================
+// Die Login-Benachrichtigungen werden jetzt zentral über notifications.js verwaltet
+
+// =========================
 // INIT
 // =========================
 document.addEventListener("DOMContentLoaded", async () => {
@@ -1214,6 +1232,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadPlayers();
   loadTeamItems();
   setupEventListeners();
+  
+  // Real-time Benachrichtigungen initialisieren
+  if (window.setupRealtimeNotifications) {
+    setTimeout(() => {
+      window.setupRealtimeNotifications();
+    }, 500);
+  }
+  
+  // Login-Benachrichtigungen werden automatisch über notifications.js verwaltet
   
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {

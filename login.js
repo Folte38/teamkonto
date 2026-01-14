@@ -28,5 +28,6 @@ async function login() {
   }
 
   // ✅ Erfolgreich eingeloggt
+  // Login-Benachrichtigung wird nach dem Laden der Seite gesendet
   window.location.href = "index.html";
 }

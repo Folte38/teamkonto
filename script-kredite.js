@@ -357,9 +357,23 @@ document.addEventListener("DOMContentLoaded", () => {
 // =========================
 // INITIALISIERUNG
 // =========================
+// =========================
+// LOGIN-BENACHRICHTIGUNGEN (werden über notifications.js verwaltet)
+// =========================
+// Die Login-Benachrichtigungen werden jetzt zentral über notifications.js verwaltet
+
 document.addEventListener("DOMContentLoaded", async () => {
   await loadProfile();
   await loadCredits();
+  
+  // Real-time Item-Benachrichtigungen einrichten
+  if (window.setupRealtimeNotifications) {
+    setTimeout(() => {
+      window.setupRealtimeNotifications();
+    }, 500);
+  }
+  
+  // Login-Benachrichtigungen werden automatisch über notifications.js verwaltet
 });
 
 // =========================

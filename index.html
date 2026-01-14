@@ -14,6 +14,7 @@
   <div class="nav-user" id="navUser" style="display:none;">
     <img id="navAvatar" src="" alt="MC Kopf">
     <span id="navUsername"></span>
+    <button id="logoutBtn" class="logout-btn" title="Ausloggen">🚪</button>
   </div>
 
   <div class="nav-links">
@@ -75,21 +76,23 @@
         </div>
       </div>
 
-      <!-- NEUER EINTRAG -->
-      <h2>✍️ Neuer Eintrag</h2>
-      <form id="paymentForm" class="card-form">
-        <select id="paymentType">
-          <option value="beitrag">Wochenbeitrag</option>
-          <option value="spende">Spende</option>
-          <option value="ausgabe">Ausgabe (Admin)</option>
-        </select>
+      <!-- NEUER EINTRAG (NUR FÜR ADMINS) -->
+      <div id="newEntrySection" style="display: none;">
+        <h2>✍️ Neuer Eintrag</h2>
+        <form id="paymentForm" class="card-form">
+          <select id="paymentType">
+            <option value="beitrag">Wochenbeitrag</option>
+            <option value="spende">Spende</option>
+            <option value="ausgabe">Ausgabe (Admin)</option>
+          </select>
 
-        <input id="paymentAmount" type="number" placeholder="Betrag">
-        <input id="paymentNote" type="text" placeholder="Kommentar">
+          <input id="paymentAmount" type="number" placeholder="Betrag">
+          <input id="paymentNote" type="text" placeholder="Kommentar">
 
-        <button type="submit">Eintragen</button>
-        <div id="paymentMsg"></div>
-      </form>
+          <button type="submit">Eintragen</button>
+          <div id="paymentMsg"></div>
+        </form>
+      </div>
 
       <!-- SPIELER -->
       <h2>👥 Spieler</h2>
@@ -115,6 +118,8 @@
 ========================= -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
+<script src="notifications.js"></script>
+<script src="logout.js"></script>
 <script src="script-index.js"></script>
 
 </body>
