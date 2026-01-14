@@ -7,21 +7,58 @@
 </head>
 <body>
 
+<!-- =========================
+     NAVIGATION
+========================= -->
+<nav class="nav">
+  <div class="nav-user" id="navUser" style="display:none;">
+    <img id="navAvatar" src="" alt="MC Kopf">
+    <span id="navUsername"></span>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html" class="active">Teamkasse</a>
+    <a href="items.html">Items</a>
+    <a href="kredite.html">Kreditanträge</a>
+  </div>
+</nav>
+
+<!-- =========================
+     PAGE
+========================= -->
 <div class="page">
 
+  <!-- LOGO -->
   <div class="logo-top">
     <img src="logo.png" alt="Logo">
   </div>
 
-  <button id="shotBtn" class="shot-btn">📸 Screenshot-Modus</button>
-
+  <!-- =========================
+       LAYOUT
+  ========================= -->
   <div class="layout">
 
+<!-- ARCHIV -->
+<div class="archive">
+  <h2>🧾 Archiv</h2>
+  <div class="archive-content">
+    <div id="archiveList"></div>
+  </div>
+</div>
+
+    <!-- HAUPTBEREICH -->
     <div class="overlay">
 
       <h1>💰 Team Kasse</h1>
       <div id="statusLine" class="status"></div>
 
+      <!-- WOCHE -->
+      <div class="week-select">
+        <label for="weekSelect">Woche:</label>
+        <select id="weekSelect"></select>
+      </div>
+
+      <!-- STATS -->
       <div class="stats">
         <div class="stat">
           <span>Kontostand</span>
@@ -34,36 +71,51 @@
         <div class="stat">
           <span>➖ Ausgaben</span>
           <strong id="expenses"></strong>
-		  <div id="expenseList" class="extras"></div>
+          <div id="expenseList" class="extras"></div>
         </div>
       </div>
 
-      <h2>➕ Einnahmen – Details</h2>
-      <ul class="list">
-        <li>Wochenbeiträge: <strong id="incContrib"></strong></li>
-        <li>Extra-Einnahmen: <strong id="incExtra"></strong></li>
-      </ul>
+      <!-- NEUER EINTRAG -->
+      <h2>✍️ Neuer Eintrag</h2>
+      <form id="paymentForm" class="card-form">
+        <select id="paymentType">
+          <option value="beitrag">Wochenbeitrag</option>
+          <option value="spende">Spende</option>
+          <option value="ausgabe">Ausgabe (Admin)</option>
+        </select>
 
-      <h2>➕ Extra-Einnahmen</h2>
-      <div id="extraIncomeList" class="extras"></div>
+        <input id="paymentAmount" type="number" placeholder="Betrag">
+        <input id="paymentNote" type="text" placeholder="Kommentar">
 
+        <button type="submit">Eintragen</button>
+        <div id="paymentMsg"></div>
+      </form>
+
+      <!-- SPIELER -->
       <h2>👥 Spieler</h2>
       <div id="players" class="players"></div>
 
-      <footer class="footer">
-        Team Kasse · Stand diese Woche
-      </footer>
+<!-- FOOTER -->
+<footer class="footer" id="mainFooter">
+  with ♥️ by Folte38 & TobiWanNoobie · Team Kasse · Stand diese Woche · Spieler werden geladen...
+</footer>
 
     </div>
 
-    <div class="goals">
-      <h2>🎯 Teamziele</h2>
-      <div id="goalsList"></div>
-    </div>
-
+<!-- TEAMZIELE -->
+<div class="goals">
+  <h2>🎯 Teamziele</h2>
+  <div class="goals-content">
+    <div id="goalsList"></div>
   </div>
 </div>
 
-<script src="script-main.js"></script>
+<!-- =========================
+     SCRIPTS
+========================= -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="script-index.js"></script>
+
 </body>
 </html>

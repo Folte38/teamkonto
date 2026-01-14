@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Kreditanträge – Team Kasse</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-user" id="navUser" style="display:none;">
+    <img id="navAvatar" alt="MC Kopf">
+    <span id="navUsername"></span>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html">Teamkasse</a>
+    <a href="items.html">Items</a>
+    <a href="kredite.html" class="active">Kredite</a>
+  </div>
+</nav>
+
+<!-- =========================
+     PAGE
+========================= -->
+<div class="page">
+
+  <!-- LOGO -->
+  <div class="logo-top">
+    <img src="logo.png" alt="Logo">
+  </div>
+
+  <!-- =========================
+       KREDIT-LAYOUT (2-SPALTEN)
+  ========================= -->
+  <div class="kredit-layout">
+    
+    <!-- LINKE SPALTE: FORMULAR & STATISTIK -->
+    <div class="kredit-left">
+      
+      <!-- FORMULAR -->
+      <div class="kredit-form-section">
+        <h2>📄 Neuer Antrag</h2>
+        <form id="creditForm" class="credit-form-compact">
+          <div class="form-row">
+            <label>👤 Antragsteller</label>
+            <input type="text" id="creditUser" disabled>
+          </div>
+
+          <div class="form-row">
+            <label>🎯 Item / Zweck</label>
+            <input type="text" id="creditPurpose" required>
+          </div>
+
+          <div class="form-row">
+            <label>💰 Gesamtpreis</label>
+            <input type="number" id="creditTotal" required>
+          </div>
+
+          <div class="form-row">
+            <label>💳 Kreditbetrag</label>
+            <input type="number" id="creditAmount" required>
+          </div>
+
+          <div class="form-row">
+            <label>📆 Rückzahlung</label>
+            <input type="text" id="creditRepayment" required placeholder="z.B. 4 Wochen">
+          </div>
+
+          <div class="form-row">
+            <label>📝 Begründung</label>
+            <textarea id="creditReason" rows="3" placeholder="Optional"></textarea>
+          </div>
+
+          <div class="form-check">
+            <input type="checkbox" id="creditConfirm" required>
+            <label for="creditConfirm">
+              🔒 Ich bestätige die Verbindlichkeit
+            </label>
+          </div>
+
+          <button type="submit" class="btn-primary">
+            Antrag einreichen
+          </button>
+        </form>
+      </div>
+
+      <!-- STATISTIK -->
+      <div class="kredit-stats-section">
+        <h2>📊 Kreditstatistik</h2>
+        
+        <div class="stats-grid">
+          <div class="stat-compact">
+            <span class="stat-label">Offene Anträge</span>
+            <strong class="stat-value" id="openCount">0</strong>
+          </div>
+          <div class="stat-compact">
+            <span class="stat-label">Angenommen</span>
+            <strong class="stat-value" id="acceptedCount">0</strong>
+          </div>
+          <div class="stat-compact">
+            <span class="stat-label">Abgelehnt</span>
+            <strong class="stat-value" id="rejectedCount">0</strong>
+          </div>
+          <div class="stat-compact">
+            <span class="stat-label">Summe beantragt</span>
+            <strong class="stat-value" id="totalRequested">0 $</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- MEINE ANTRÄGE -->
+      <div class="my-credits-section">
+        <h2>🏆 Meine Anträge</h2>
+        <div id="myCreditsList" class="my-credits-list"></div>
+      </div>
+
+    </div>
+
+<!-- RECHTE SPALTE: AKTIVE ANTRÄGE & ABSTIMMUNG -->
+<div class="kredit-right">
+  
+  <!-- HEADER & INFO -->
+  <div class="kredit-header">
+    <h1>💳 Kreditanträge</h1>
+<div id="statusLine" class="status">
+  Verwalte und beantrage Kredite für Teamprojekte. 
+  <strong>Neuer Prozess:</strong> Zuerst wird abgestimmt, dann entscheidet ein Admin über Annahme/Ablehnung.
+  Jedes Mitglied kann einmal pro Antrag abstimmen.
+</div>
+  </div>
+
+  <!-- AKTIVE ANTRÄGE -->
+  <div class="active-credits-section">
+    <h2>📋 Aktive Anträge</h2>
+    <div id="creditList" class="credit-list-container"></div>
+  </div>
+
+  <!-- ABSTIMMUNGS-CONTAINER (für ausgewählten Antrag) -->
+  <div id="votingContainer" class="voting-container" style="display: none;">
+    <h2>🗳️ Aktuelle Abstimmung</h2>
+    <div class="selected-credit-info">
+      <h3 id="selectedCreditPurpose"></h3>
+      <div class="credit-meta-small">
+        <div><strong>Kreditbetrag:</strong> <span id="selectedCreditAmount"></span> $</div>
+        <div><strong>Antragsteller:</strong> <span id="selectedCreditUser"></span></div>
+      </div>
+      
+      <!-- PROGRESSBAR -->
+      <div class="vote-progress-container">
+        <div class="vote-progress">
+          <div class="vote-yes-bar" style="width:0%"></div>
+          <div class="vote-no-bar" style="width:0%"></div>
+          <div class="vote-text">0 👍 | 0 👎 (0%)</div>
+        </div>
+      </div>
+
+      <!-- ABSTIMMUNGS-BUTTONS -->
+      <div class="voting-buttons">
+        <button id="voteYesBtn" class="vote-btn vote-yes-btn">
+          👍 Ja, dafür
+        </button>
+        <button id="voteNoBtn" class="vote-btn vote-no-btn">
+          👎 Nein, dagegen
+        </button>
+      </div>
+      
+      <small class="vote-note">Deine Stimme wird sofort gezählt.</small>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="script-kredite.js"></script>
+
+</body>
+</html>

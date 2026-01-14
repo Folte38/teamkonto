@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Items</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-user" id="navUser" style="display:none;">
+    <img id="navAvatar" src="" alt="MC Kopf">
+    <span id="navUsername"></span>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html">Teamkasse</a>
+    <a href="items.html" class="active">Items</a>
+    <a href="kredite.html">Kreditanträge</a>
+  </div>
+</nav>
+
+<div class="page-box items-page">
+  <h1 class="page-title">Team Items 🧰</h1>
+
+  <!-- NEUE KONTROLLELEMENTE -->
+<div class="items-controls">
+  <div class="filter-container">
+    <button class="filter-btn" id="filterToggleBtn">
+      🔍 Filter
+    </button>
+    
+    <div class="view-toggle">
+      <button class="view-btn active" id="viewAllBtn" title="Alle Spieler">
+        👥 Alle
+      </button>
+      <button class="view-btn" id="viewSingleBtn" title="Einzelner Spieler">
+        👤 Einzel
+      </button>
+    </div>
+  </div>
+  
+  <div class="search-container">
+    <input type="text" id="itemSearchInput" placeholder="Item suchen..." class="search-input">
+    <button id="clearSearchBtn" class="clear-search">✕</button>
+  </div>
+  
+  <!-- NEUE ACTION-BUTTONS RECHTS -->
+  <div class="action-buttons-row">
+    <button class="add-item-btn" id="addItemBtn" title="Neues Item hinzufügen">
+      ➕ Item hinzufügen
+    </button>
+    <button id="returnAllBtn">➖ Items zurücklegen</button>
+  </div>
+</div>
+
+  <!-- SPIELER AUSWAHL (für Einzelansicht) -->
+  <div class="player-selection-container" id="playerSelectionContainer" style="display: none;">
+    <h3>Spieler auswählen:</h3>
+    <div class="player-selection-grid" id="playerSelectionGrid">
+      <!-- Spieler werden via JS geladen -->
+    </div>
+  </div>
+
+  <!-- AKTIVE FILTER ANZEIGE -->
+  <div class="active-filters" id="activeFilters" style="display: none;">
+    <div class="filter-tags" id="filterTags"></div>
+    <button class="clear-filters-btn" id="clearFiltersBtn">Alle Filter löschen</button>
+  </div>
+
+  <div id="teamItems"></div>
+</div>
+
+<!-- MODAL FÜR NEUES ITEM -->
+<div class="modal-overlay" id="addItemModal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>➕ Neues Item hinzufügen</h2>
+      <button class="modal-close" id="closeModalBtn">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="addItemForm">
+        <div class="form-group">
+          <label for="itemName">Item Name:</label>
+          <input type="text" id="itemName" placeholder="z.B. Netherit-Pickaxe" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="itemOwner">Besitzer (Spieler):</label>
+          <div class="owner-selection-grid" id="ownerSelectionGrid">
+            <!-- Spieler werden via JS geladen -->
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-submit">Item hinzufügen</button>
+          <button type="button" class="btn-cancel" id="cancelModalBtn">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="script-items.js"></script>
+
+</body>
+</html>
