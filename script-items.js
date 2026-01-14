@@ -370,7 +370,7 @@ async function loadTeamItems() {
         let isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
 
         if (!holder) {
-          statusHtml = `<div class="item-empty">nicht in Benutzung</div>`;
+          statusHtml = `<div class="item-available">verfügbar</div>`;
         } else {
           const name = holder.profiles?.mc_name || "Unbekannt";
           isMine = holder.user_id === CURRENT_USER_ID;
@@ -378,7 +378,7 @@ async function loadTeamItems() {
           statusHtml = `
             <div class="item-holder">
               <img src="https://mc-heads.net/avatar/${name}/24">
-              ${name}
+              <span>ausgeliehen von ${name}</span>
               ${
                 IS_ADMIN && !isMine
                   ? `<span class="remove-holder"
@@ -460,7 +460,7 @@ async function loadTeamItems() {
         let isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
 
         if (!holder) {
-          statusHtml = `<div class="item-empty">nicht in Benutzung</div>`;
+          statusHtml = `<div class="item-available">verfügbar</div>`;
         } else {
           const name = holder.profiles?.mc_name || "Unbekannt";
           isMine = holder.user_id === CURRENT_USER_ID;
@@ -468,7 +468,7 @@ async function loadTeamItems() {
           statusHtml = `
             <div class="item-holder">
               <img src="https://mc-heads.net/avatar/${name}/24">
-              ${name}
+              <span>ausgeliehen von ${name}</span>
               ${
                 IS_ADMIN && !isMine
                   ? `<span class="remove-holder"
@@ -524,13 +524,6 @@ async function toggleItem(itemId) {
     .select("id")
     .eq("item_id", itemId)
     .eq("user_id", CURRENT_USER_ID)
-    .maybeSingle();
-
-  // Item-Name für Benachrichtigung laden
-  const { data: item } = await window.supabaseClient
-    .from("team_items")
-    .select("name")
-    .eq("id", itemId)
     .single();
 
   if (existing) {
@@ -540,17 +533,24 @@ async function toggleItem(itemId) {
       .delete()
       .eq("id", existing.id);
     
-    // Benachrichtigung wird automatisch über Realtime ausgelöst
+    // Benachrichtigung
+    if (window.showNotification) {
+      window.showNotification("Item zurückgelegt", "success");
+    }
   } else {
     // Item ausleihen
     await window.supabaseClient
       .from("team_item_usage")
       .insert([{ item_id: itemId, user_id: CURRENT_USER_ID }]);
     
-    // Benachrichtigung wird automatisch über Realtime ausgelöst
+    // Benachrichtigung
+    if (window.showNotification) {
+      window.showNotification("Item ausgeliehen", "success");
+    }
   }
-
-  setTimeout(loadTeamItems, 200);
+  
+  // UI aktualisieren
+  await loadTeamItems();
 }
 
 // =========================
@@ -558,19 +558,7 @@ async function toggleItem(itemId) {
 // =========================
 async function removeItemFromDatabase(itemId, itemName, playerName) {
   try {
-    const { data: usageData } = await window.supabaseClient
-      .from("team_item_usage")
-      .select("*")
-      .eq("item_id", itemId)
-      .single();
-    
-    if (usageData) {
-      await window.supabaseClient
-        .from("team_item_usage")
-        .delete()
-        .eq("item_id", itemId);
-    }
-    
+    // Direkt von team_items löschen (keine team_item_usage mehr)
     const { error } = await window.supabaseClient
       .from("team_items")
       .delete()

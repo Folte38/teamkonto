@@ -229,12 +229,14 @@ async function loadPaymentsFromDB() {
   document.getElementById("expenses").textContent = formatMoney(ausgabe);
   document.getElementById("balance").textContent = formatMoney(balance);
 
-  document.getElementById("incContrib").textContent = formatMoney(beitrag);
-  document.getElementById("incExtra").textContent = formatMoney(spende);
+  const incContribEl = document.getElementById("incContrib");
+  const incExtraEl = document.getElementById("incExtra");
+  if (incContribEl) incContribEl.textContent = formatMoney(beitrag);
+  if (incExtraEl) incExtraEl.textContent = formatMoney(spende);
 }
 
 // =========================
-// SPIELERSTATUS
+// SPIELERSTATUS - SAUBERE VERSION
 // =========================
 async function loadPlayerPaymentStatus() {
   console.log("Lade Spielerstatus für Woche:", SELECTED_WEEK || CURRENT_WEEK);
@@ -248,23 +250,21 @@ async function loadPlayerPaymentStatus() {
   // Loading-Status anzeigen
   el.innerHTML = '<div class="loading">Lade Spieler...</div>';
   
-  // Footer auf "Wird geladen..." setzen
   const footer = document.querySelector('.footer');
   if (footer) {
     footer.textContent = `Team Kasse · Stand diese Woche · Spieler werden geladen...`;
   }
 
   try {
-    // Alle Profile laden
+    // NUR profiles laden - keine payments mehr!
     const { data: profiles, error: profilesError } = await window.supabaseClient
       .from("profiles")
-      .select("id, mc_name");
+      .select("id, mc_name, payment_status");
       
     if (profilesError || !profiles) {
       console.error("Fehler beim Laden der Profile:", profilesError);
       el.innerHTML = '<div class="error">Fehler beim Laden der Spieler</div>';
       
-      // Footer mit Fehler aktualisieren
       if (footer) {
         footer.textContent = `Team Kasse · Stand diese Woche · Fehler beim Laden`;
       }
@@ -273,54 +273,38 @@ async function loadPlayerPaymentStatus() {
     
     console.log("Profile geladen:", profiles.length);
 
-    // Zahlungen für aktuelle Woche laden
-    const { data: payments, error: paymentsError } = await window.supabaseClient
-      .from("payments")
-      .select("user_id, amount")
-      .eq("type", "beitrag")
-      .eq("week", SELECTED_WEEK || CURRENT_WEEK);
-      
-    if (paymentsError) {
-      console.error("Fehler beim Laden der Zahlungen:", paymentsError);
-    }
-    
-    console.log("Zahlungen geladen:", payments?.length || 0);
-
-    const sums = {};
-    if (payments) {
-      payments.forEach(p => {
-        sums[p.user_id] = (sums[p.user_id] || 0) + p.amount;
-      });
-    }
-
     el.innerHTML = "";
     
-    // Spieler rendern
-    profiles.forEach(p => {
-      const sum = sums[p.id] || 0;
-      let status = "unpaid";
-      let label = "Nicht bezahlt";
-
-      if (sum >= WEEKLY_CONTRIBUTION) {
-        status = "paid";
-        label = "Bezahlt";
-      } else if (sum > 0) {
-        status = "partial";
-        label = "Teilzahlung";
-      }
-
+    // DEBUG: Alle Profile ausgeben
+    console.log("🔍 DEBUG - Alle Profile:", profiles);
+    console.log("🔍 DEBUG - Profile Anzahl:", profiles.length);
+    
+    // Spieler rendern mit NUR payment_status
+    profiles.forEach((p, index) => {
+      console.log(`🔍 DEBUG - Spieler ${index + 1}:`, p);
+      
+      // Status direkt aus profiles.payment_status lesen
+      const status = p.payment_status === 1 ? "paid" : "unpaid";
+      const label = p.payment_status === 1 ? "Bezahlt" : "Nicht bezahlt";
+      
+      console.log(`🔍 DEBUG - Status für ${p.mc_name}:`, status, label);
+      
       el.innerHTML += `
-        <div class="player ${status}">
+        <div class="player ${status}" data-player-id="${p.id}" data-player-name="${p.mc_name}">
           <img src="https://mc-heads.net/avatar/${p.mc_name}/64" 
                alt="${p.mc_name}"
                onerror="this.src='https://mc-heads.net/avatar/Steve/64'">
           <div class="name">${p.mc_name}</div>
           <small>${label}</small>
+          ${IS_ADMIN ? `
+            ${p.payment_status !== 1 ? `<button class="mark-paid-btn" onclick="markPlayerAsPaid('${p.id}', '${p.mc_name}')" title="Als bezahlt markieren">✓</button>` : `<button class="mark-unpaid-btn" onclick="markPlayerAsUnpaid('${p.id}', '${p.mc_name}')" title="Als nicht bezahlt markieren">✗</button>`}
+          ` : ""}
         </div>
       `;
     });
 
-    const paidCount = profiles.filter(p => (sums[p.id] || 0) >= WEEKLY_CONTRIBUTION).length;
+    // Status-Zählung basierend auf payment_status
+    const paidCount = profiles.filter(p => p.payment_status === 1).length;
     const totalCount = profiles.length;
     
     // Status-Farbe basierend auf Anzahl der bezahlenden Spieler
@@ -334,10 +318,12 @@ async function loadPlayerPaymentStatus() {
     }
     
     const statusLine = document.getElementById("statusLine");
-    statusLine.innerText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
-    statusLine.className = `status ${statusClass}`;
+    if (statusLine) {
+      statusLine.innerText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+      statusLine.className = `status ${statusClass}`;
+    }
     
-    // FOOTER AKTUALISIEREN - WICHTIG!
+    // FOOTER AKTUALISIEREN
     if (footer) {
       footer.textContent = `with ♥️ by Folte38 & TobiWanNoobie · Team Kasse · Stand diese Woche · ${profiles.length} Spieler`;
       console.log(`Footer aktualisiert: ${profiles.length} Spieler`);
@@ -350,6 +336,141 @@ async function loadPlayerPaymentStatus() {
     if (footer) {
       footer.textContent = `Team Kasse · Stand diese Woche · Fehler aufgetreten`;
     }
+  }
+}
+
+// =========================
+// ADMIN: SPIELER ALS BEZAHLT MARKIEREN
+// =========================
+async function markPlayerAsPaid(playerId, playerName) {
+  if (!IS_ADMIN) {
+    alert("Nur Admins können diese Aktion durchführen!");
+    return;
+  }
+  
+  if (!confirm(`Möchtest du ${playerName} für diese Woche als bezahlt markieren?`)) {
+    return;
+  }
+  
+  try {
+    console.log("✅ Markiere Spieler als bezahlt:", { playerId, playerName });
+    console.log("🔍 RPC-Funktion wird aufgerufen...");
+    
+    // Zuerst RPC-Funktion versuchen
+    const { data, error } = await window.supabaseClient
+      .rpc('mark_player_as_paid', { player_uuid: playerId });
+      
+    console.log("📊 RPC Ergebnis:", { data, error });
+      
+    if (error) {
+      console.error("❌ RPC-Fehler:", error);
+      console.log("🔄 Versuche Fallback: Direktes Update...");
+      
+      // Fallback: Direktes Update
+      const { data: fallbackData, error: fallbackError } = await window.supabaseClient
+        .from("profiles")
+        .update({ payment_status: 1 })
+        .eq("id", playerId);
+        
+      console.log("📊 Fallback Ergebnis:", { fallbackData, fallbackError });
+      
+      if (fallbackError) {
+        console.error("❌ Auch Fallback fehlgeschlagen:", fallbackError);
+        alert("Fehler beim Aktualisieren: " + fallbackError.message);
+        return;
+      }
+    } else if (!data) {
+      console.error("❌ Keine RPC-Daten zurückgegeben");
+      console.log("🔄 Versuche Fallback: Direktes Update...");
+      
+      // Fallback: Direktes Update
+      const { data: fallbackData, error: fallbackError } = await window.supabaseClient
+        .from("profiles")
+        .update({ payment_status: 1 })
+        .eq("id", playerId);
+        
+      console.log("📊 Fallback Ergebnis:", { fallbackData, fallbackError });
+      
+      if (fallbackError) {
+        console.error("❌ Auch Fallback fehlgeschlagen:", fallbackError);
+        alert("Fehler beim Aktualisieren: " + fallbackError.message);
+        return;
+      }
+    } else {
+      console.log("✅ RPC-Funktion erfolgreich ausgeführt:", data);
+    }
+    
+    // Erfolgsmeldung
+    alert(`${playerName} wurde erfolgreich als bezahlt markiert!`);
+    
+    // SOFORT UI aktualisieren mit Cache-Busting
+    console.log("🔄 SOFORT UI aktualisieren...");
+    await loadPlayerPaymentStatus();
+    console.log("✅ UI sofort aktualisiert");
+    
+    // Zusätzlicher Reload nach 200ms für Sicherheit
+    setTimeout(async () => {
+      console.log("🔄 Zusätzlicher Reload...");
+      await loadPlayerPaymentStatus();
+      console.log("✅ Zusätzlicher Reload durchgeführt");
+    }, 200);
+    
+  } catch (error) {
+    console.error("❌ Unerwarteter Fehler:", error);
+    alert("Fehler: " + error.message);
+  }
+}
+
+// =========================
+// ADMIN: SPIELER ALS NICHT BEZAHLT MARKIEREN
+// =========================
+async function markPlayerAsUnpaid(playerId, playerName) {
+  if (!IS_ADMIN) {
+    alert("Nur Admins können diese Aktion durchführen!");
+    return;
+  }
+  
+  if (!confirm(`Möchtest du ${playerName} für diese Woche als nicht bezahlt markieren?`)) {
+    return;
+  }
+  
+  try {
+    console.log("🗑️ Markiere Spieler als nicht bezahlt:", { playerId, playerName });
+    
+    // Neue einfache Funktion aufrufen
+    const { data, error } = await window.supabaseClient
+      .rpc('mark_player_as_unpaid', { player_uuid: playerId });
+      
+    if (error) {
+      console.error("Fehler beim Aktualisieren des Status:", error);
+      alert("Fehler beim Aktualisieren: " + error.message);
+      return;
+    }
+    
+    if (!data) {
+      console.error("Keine Daten zurückgegeben");
+      alert("Fehler: Keine Daten vom Server");
+      return;
+    }
+    
+    // Erfolgsmeldung
+    alert(`${playerName} wurde erfolgreich als nicht bezahlt markiert!`);
+    
+    // SOFORT UI aktualisieren mit Cache-Busting
+    console.log("🔄 SOFORT UI aktualisieren...");
+    await loadPlayerPaymentStatus();
+    console.log("✅ UI sofort aktualisiert");
+    
+    // Zusätzlicher Reload nach 200ms für Sicherheit
+    setTimeout(async () => {
+      console.log("🔄 Zusätzlicher Reload...");
+      await loadPlayerPaymentStatus();
+      console.log("✅ Zusätzlicher Reload durchgeführt");
+    }, 200);
+    
+  } catch (error) {
+    console.error("Unerwarteter Fehler:", error);
+    alert("Fehler: " + error.message);
   }
 }
 
@@ -409,8 +530,7 @@ async function loadArchive() {
     `;
   });
   
-  // Container-Höhen nach Laden anpassen
-  setTimeout(adjustContainerHeights, 50);
+  // Container-Höhen werden nicht mehr angepasst
 }
 
 // =========================

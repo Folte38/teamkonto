@@ -2469,6 +2469,68 @@ body {
   font-weight: 500;
 }
 
+/* Admin-Button: Spieler als bezahlt markieren */
+.mark-paid-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(76, 175, 80, 0.9);
+  border: 2px solid rgba(76, 175, 80, 0.5);
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.mark-paid-btn:hover {
+  background: rgba(76, 175, 80, 1);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.4);
+}
+
+.mark-paid-btn:active {
+  transform: scale(0.95);
+}
+
+/* Admin-Button: Spieler als nicht bezahlt markieren */
+.mark-unpaid-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(244, 67, 54, 0.9);
+  border: 2px solid rgba(244, 67, 54, 0.5);
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.mark-unpaid-btn:hover {
+  background: rgba(244, 67, 54, 1);
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(244, 67, 54, 0.4);
+}
+
+.mark-unpaid-btn:active {
+  transform: scale(0.95);
+}
+
 /* =========================
    LOADING & ERROR STATES
 ========================= */
