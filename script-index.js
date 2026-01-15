@@ -12,6 +12,7 @@ window.supabaseClient.auth.getSession().then(({ data }) => {
     document.getElementById('mainContent').style.display = 'block';
     initializeApp();
   }
+  // Wenn nicht eingeloggt, bleibt der Benutzer auf der Login-Seite
 });
 
 // APP INITIALISIERUNG
@@ -22,12 +23,25 @@ function initializeApp() {
     loadPlayerPaymentStatus();
     loadArchive();
     loadTeamGoals();
-    setupEventListeners();
+    // Event Listener werden nach DOM-Laden eingerichtet
   });
 }
 
+// Event Listener nach DOM-Laden einrichten
+document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM geladen, warte auf App-Initialisierung...");
+  
+  // Warte kurz, bis die App initialisiert ist
+  setTimeout(() => {
+    console.log("Richte Event Listener ein...");
+    console.log("IS_ADMIN Status:", IS_ADMIN);
+    setupEventListeners();
+  }, 1000);
+});
+
 // EVENT LISTENER SETUP
 function setupEventListeners() {
+  // Week Select Event Listener
   const weekSelect = document.getElementById("weekSelect");
   if (weekSelect && !weekSelect.hasAttribute('data-listener-added')) {
     weekSelect.addEventListener("change", () => {
@@ -38,6 +52,261 @@ function setupEventListeners() {
     });
     weekSelect.setAttribute('data-listener-added', 'true');
   }
+  
+  // Archiv Modal
+  const archiveAddBtn = document.getElementById("archiveAddBtn");
+  if (archiveAddBtn) {
+    archiveAddBtn.addEventListener("click", showArchiveModal);
+  }
+  
+  const closeArchiveModal = document.getElementById("closeArchiveModal");
+  if (closeArchiveModal) {
+    closeArchiveModal.addEventListener("click", hideArchiveModal);
+  }
+  
+  const archiveModal = document.getElementById("archiveModal");
+  if (archiveModal) {
+    archiveModal.addEventListener("click", (e) => {
+      if (e.target === archiveModal) {
+        hideArchiveModal();
+      }
+    });
+  }
+  
+  // Teamziele Modal
+  const goalAddBtn = document.getElementById("goalAddBtn");
+  if (goalAddBtn) {
+    goalAddBtn.addEventListener("click", showGoalModal);
+  }
+  
+  const closeGoalModal = document.getElementById("closeGoalModal");
+  if (closeGoalModal) {
+    closeGoalModal.addEventListener("click", hideGoalModal);
+  }
+  
+  const goalModal = document.getElementById("goalModal");
+  if (goalModal) {
+    goalModal.addEventListener("click", (e) => {
+      if (e.target === goalModal) {
+        hideGoalModal();
+      }
+    });
+  }
+  
+  // ESC Taste
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      hideArchiveModal();
+      hideGoalModal();
+    }
+  });
+  
+  // Spieler Click Handler
+  document.addEventListener("click", (e) => {
+    try {
+      const playerBox = e.target.closest(".player.clickable");
+      console.log("Spieler Click:", playerBox, "IS_ADMIN:", IS_ADMIN);
+      
+      if (playerBox && IS_ADMIN) {
+        const playerId = playerBox.dataset.playerId;
+        const playerName = playerBox.dataset.playerName;
+        const isPaid = playerBox.classList.contains("paid");
+        
+        console.log("Spieler Daten:", { playerId, playerName, isPaid });
+        
+        if (isPaid) {
+          console.log("Rufe markPlayerAsUnpaid auf...");
+          markPlayerAsUnpaid(playerId, playerName);
+        } else {
+          console.log("Rufe markPlayerAsPaid auf...");
+          markPlayerAsPaid(playerId, playerName);
+        }
+      }
+    } catch (error) {
+      console.error("Fehler im Spieler Click Handler:", error);
+    }
+  });
+  
+  // Archiv Formular
+  const archivePaymentForm = document.getElementById("archivePaymentForm");
+  if (archivePaymentForm) {
+    archivePaymentForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const type = document.getElementById("archivePaymentType").value;
+      const amount = parseInt(document.getElementById("archivePaymentAmount").value);
+      const note = document.getElementById("archivePaymentNote").value;
+      const archivePaymentMsg = document.getElementById("archivePaymentMsg");
+
+      if (!amount || amount <= 0) {
+        archivePaymentMsg.innerText = "❌ Bitte gültigen Betrag eingeben";
+        return;
+      }
+
+      try {
+        const { error } = await window.supabaseClient
+          .from("payments")
+          .insert([{
+            user_id: user.id,
+            type,
+            amount,
+            note,
+            week: SELECTED_WEEK || CURRENT_WEEK
+          }]);
+
+        if (error) {
+          console.error("Fehler beim Speichern:", error);
+          archivePaymentMsg.innerText = "❌ Fehler: " + error.message;
+        } else {
+          archivePaymentMsg.innerText = "✅ Eintrag gespeichert";
+          archivePaymentForm.reset();
+          
+          // Sofortige UI-Aktualisierung - neuen Eintrag direkt hinzufügen
+          const archiveList = document.getElementById("archiveList");
+          if (archiveList) {
+            // Wenn "Keine Einträge" Nachricht da ist, entferne sie
+            if (archiveList.firstChild && archiveList.firstChild.classList && archiveList.firstChild.classList.contains('no-entries')) {
+              archiveList.innerHTML = '';
+            }
+            
+            const newEntry = document.createElement('div');
+            const sign = type === "ausgabe" ? "-" : "+";
+            const cls = type === "ausgabe" ? "expense" : "income";
+            const label = type === "beitrag" ? "Wochenbeitrag" : type === "spende" ? "Spende" : "Ausgabe";
+            const escapedNote = note.replace(/'/g, "\\'");
+            
+            newEntry.className = `archive-entry ${cls}`;
+            newEntry.setAttribute('data-payment-id', 'temp-' + Date.now());
+            newEntry.innerHTML = `
+              <div class="archive-content">
+                <div class="amount">${sign} ${amount.toLocaleString()} $</div>
+                <div class="description">${label}${note ? " · " + note : ""}</div>
+                <div class="meta">${user.user_metadata?.mc_name || "—"} • ${new Date().toLocaleDateString('de-DE')}</div>
+              </div>
+              ${IS_ADMIN ? `<div class="archive-actions"><button class="archive-delete-btn" onclick="deleteArchiveEntry('temp-${Date.now()}', '${type}', ${amount}, '${escapedNote}')" title="Eintrag löschen">×</button></div>` : ''}
+            `;
+            newEntry.style.opacity = '0';
+            archiveList.insertBefore(newEntry, archiveList.firstChild);
+            setTimeout(() => {
+              newEntry.style.opacity = '1';
+              newEntry.style.transition = 'opacity 0.3s';
+            }, 100);
+          }
+          
+          // UI im Hintergrund aktualisieren (für Konsistenz)
+          Promise.all([
+            loadPaymentsFromDB(),
+            loadPlayerPaymentStatus(),
+            loadArchive()
+          ]).then(() => {
+            console.log("Hintergrund-Aktualisierung abgeschlossen");
+          });
+          
+          // Modal nach kurzer Verzögerung schließen
+          setTimeout(() => {
+            hideArchiveModal();
+            archivePaymentMsg.innerText = ""; // Nachricht zurücksetzen
+          }, 1000);
+        }
+      } catch (error) {
+        console.error("Unerwarteter Fehler:", error);
+        archivePaymentMsg.innerText = "❌ Unerwarteter Fehler: " + error.message;
+      }
+    });
+  }
+  
+  // Kommentar-Sichtbarkeit
+  const archivePaymentTypeSelect = document.getElementById("archivePaymentType");
+  const archivePaymentNoteInput = document.getElementById("archivePaymentNote");
+
+  if (archivePaymentTypeSelect && archivePaymentNoteInput) {
+    function updateArchiveNoteVisibility() {
+      const type = archivePaymentTypeSelect.value;
+      archivePaymentNoteInput.style.display = (type === "spende" || type === "ausgabe") ? "block" : "none";
+      if (type === "beitrag") {
+        archivePaymentNoteInput.value = "";
+      }
+    }
+
+    archivePaymentTypeSelect.addEventListener("change", updateArchiveNoteVisibility);
+    updateArchiveNoteVisibility();
+  }
+  
+  // Teamziele Formular
+  const goalForm = document.getElementById("goalForm");
+  if (goalForm) {
+    goalForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const name = document.getElementById("goalName").value;
+      const cost = parseInt(document.getElementById("goalCost").value);
+      const current = parseInt(document.getElementById("goalCurrent").value) || 0;
+      
+      const progress = Math.min(Math.max((current / cost) * 100, 0.01), 100);
+      
+      const goalMsg = document.getElementById("goalMsg");
+
+      if (!name || !cost || cost <= 0) {
+        goalMsg.innerText = "❌ Bitte alle Felder ausfüllen";
+        return;
+      }
+
+      let result;
+      if (EDITING_GOAL_ID) {
+        result = await window.supabaseClient
+          .from("team_goals")
+          .update({
+            name,
+            cost,
+            progress,
+            current_exact: current
+          })
+          .eq("id", EDITING_GOAL_ID);
+          
+        if (!result.error) {
+          goalMsg.innerText = "✅ Ziel aktualisiert";
+        }
+      } else {
+        result = await window.supabaseClient
+          .from("team_goals")
+          .insert([{
+            name,
+            cost,
+            progress,
+            current_exact: current,
+            created_by: user.id,
+            is_active: true
+          }]);
+          
+        if (!result.error) {
+          goalMsg.innerText = "✅ Ziel hinzugefügt";
+        }
+      }
+
+      if (result.error) {
+        goalMsg.innerText = result.error.message;
+      } else {
+        goalForm.reset();
+        
+        setTimeout(async () => {
+          await loadTeamGoals();
+        }, 100);
+        
+        setTimeout(() => {
+          hideGoalModal();
+        }, 1000);
+      }
+    });
+  }
+  
+  // Server Status
+  initializeServerStatus();
 }
 
 // HILFSFUNKTIONEN
@@ -289,133 +558,296 @@ async function loadPlayerPaymentStatus() {
 
 // ADMIN: SPIELER ALS BEZAHLT MARKIEREN
 async function markPlayerAsPaid(playerId, playerName) {
-  if (!IS_ADMIN) {
-    alert("Nur Admins können diese Aktion durchführen!");
-    return;
-  }
-  
-  if (!confirm(`Möchtest du ${playerName} für diese Woche als bezahlt markieren?`)) {
-    return;
-  }
-  
-  try {
-    // Spielerstatus aktualisieren
-    const { error: statusError } = await window.supabaseClient
-      .from("profiles")
-      .update({ payment_status: 1 })
-      .eq("id", playerId);
-      
-    if (statusError) {
-      alert("Fehler beim Aktualisieren des Status: " + statusError.message);
-      return;
-    }
-    
-    // Archiv-Eintrag erstellen
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    
-    if (user) {
-      const { error: archiveError } = await window.supabaseClient
-        .from("payments")
-        .insert([{
-          user_id: user.id,
-          type: "beitrag",
-          amount: 2000000,
-          note: playerName,
-          week: SELECTED_WEEK || CURRENT_WEEK
-        }]);
+  showConfirmModal(
+    "Spieler als bezahlt markieren",
+    `Möchtest du ${playerName} für diese Woche wirklich als bezahlt markieren?\n\nEs wird ein 2.000.000 $ Wochenbeitrag-Eintrag erstellt.`,
+    "Ja, als bezahlt markieren",
+    "Abbrechen",
+    async () => {
+      try {
+        // Sofortige UI-Aktualisierung - VOR der Datenbank-Operation
+        showNotification(`${playerName} wird als bezahlt markiert...`, "info");
         
-      if (archiveError) {
-        console.error("Fehler beim Archiv-Eintrag:", archiveError);
+        // Sofortige UI-Aktualisierung - Spieler-Status ändern
+        const allPlayers = document.querySelectorAll('.player');
+        allPlayers.forEach(player => {
+          if (player.dataset.playerName === playerName) {
+            player.classList.add('paid');
+            player.classList.remove('unpaid');
+            const statusElement = player.querySelector('small');
+            if (statusElement) {
+              statusElement.textContent = 'Bezahlt';
+            }
+          }
+        });
+        
+        // Sofortige UI-Aktualisierung - füge den neuen Eintrag zum Archiv hinzu
+        const archiveList = document.getElementById("archiveList");
+        if (archiveList) {
+          // Wenn "Keine Einträge" Nachricht da ist, entferne sie
+          if (archiveList.firstChild && archiveList.firstChild.classList && archiveList.firstChild.classList.contains('no-entries')) {
+            archiveList.innerHTML = '';
+          }
+          
+          const newEntry = document.createElement('div');
+          newEntry.className = 'archive-entry income';
+          newEntry.setAttribute('data-payment-id', 'temp-' + Date.now());
+          newEntry.innerHTML = `
+            <div class="archive-content">
+              <div class="amount">+ 2.000.000 $</div>
+              <div class="description">Wochenbeitrag · ${playerName}</div>
+              <div class="meta">${playerName} • ${new Date().toLocaleDateString('de-DE')}</div>
+            </div>
+            ${IS_ADMIN ? `<div class="archive-actions"><button class="archive-delete-btn" onclick="deleteArchiveEntry('temp-${Date.now()}', 'beitrag', 2000000, '${playerName}')" title="Eintrag löschen">×</button></div>` : ''}
+          `;
+          newEntry.style.opacity = '0';
+          archiveList.insertBefore(newEntry, archiveList.firstChild);
+          setTimeout(() => {
+            newEntry.style.opacity = '1';
+            newEntry.style.transition = 'opacity 0.3s';
+          }, 100);
+        }
+        
+        // Sofortige UI-Aktualisierung - Statuszeile und Footer
+        const paidCount = document.querySelectorAll('.player.paid').length;
+        const totalCount = document.querySelectorAll('.player').length;
+        
+        let statusClass = "";
+        if (paidCount === 0) {
+          statusClass = "status-red";
+        } else if (paidCount < totalCount) {
+          statusClass = "status-orange";
+        } else {
+          statusClass = "status-green";
+        }
+        
+        const statusLine = document.getElementById("statusLine");
+        if (statusLine) {
+          const statusText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+          statusLine.innerText = statusText;
+          statusLine.className = `status ${statusClass}`;
+        }
+        
+        const footer = document.querySelector('.footer');
+        if (footer) {
+          footer.textContent = `♥️ by Folte38 & TobiWanNoobie · Dashboard · Stand diese Woche · ${totalCount} Spieler`;
+        }
+        
+        // Jetzt die Datenbank-Operationen
+        // Prüfen ob bereits ein Eintrag existiert
+        const { data: existingPayments } = await window.supabaseClient
+          .from("payments")
+          .select("*")
+          .eq("type", "beitrag")
+          .eq("amount", 2000000)
+          .eq("note", playerName)
+          .eq("week", SELECTED_WEEK || CURRENT_WEEK)
+          .order("created_at", { ascending: false })
+          .limit(1);
+          
+        if (existingPayments && existingPayments.length > 0) {
+          showNotification(`${playerName} ist bereits als bezahlt markiert!`, "warning");
+          // UI bei Fehler wiederherstellen
+          loadPlayerPaymentStatus();
+          loadArchive();
+          return;
+        }
+        
+        // Neuen Eintrag erstellen
+        const { error: insertError } = await window.supabaseClient
+          .from("payments")
+          .insert([{
+            user_id: (await window.supabaseClient.auth.getUser()).data.user.id,
+            type: "beitrag",
+            amount: 2000000,
+            note: playerName,
+            week: SELECTED_WEEK || CURRENT_WEEK
+          }]);
+          
+        if (insertError) {
+          showNotification("Fehler beim Erstellen des Eintrags: " + insertError.message, "error");
+          // UI bei Fehler wiederherstellen
+          loadPlayerPaymentStatus();
+          loadArchive();
+          return;
+        }
+        
+        // Spielerstatus aktualisieren
+        const { error: statusError } = await window.supabaseClient
+          .rpc('mark_player_as_paid', { player_uuid: playerId });
+          
+        if (statusError) {
+          // Fallback: Direktes Update
+          const { error: fallbackError } = await window.supabaseClient
+            .from("profiles")
+            .update({ payment_status: 1 })
+            .eq("id", playerId);
+            
+          if (fallbackError) {
+            showNotification("Fehler beim Aktualisieren des Status: " + fallbackError.message, "error");
+            // UI bei Fehler wiederherstellen
+            loadPlayerPaymentStatus();
+            return;
+          }
+        }
+        
+        showNotification(`${playerName} wurde erfolgreich als bezahlt markiert!`, "success");
+        
+        // UI im Hintergrund aktualisieren (für Konsistenz)
+        Promise.all([
+          loadPlayerPaymentStatus(),
+          loadPaymentsFromDB(),
+          loadArchive()
+        ]).then(() => {
+          console.log("Hintergrund-Aktualisierung abgeschlossen");
+        });
+        
+      } catch (error) {
+        showNotification("Fehler: " + error.message, "error");
       }
     }
-    
-    alert(`${playerName} wurde erfolgreich als bezahlt markiert!`);
-    
-    // UI aktualisieren
-    await Promise.all([
-      loadPlayerPaymentStatus(),
-      loadPaymentsFromDB(),
-      loadArchive()
-    ]);
-    
-  } catch (error) {
-    alert("Fehler: " + error.message);
-  }
+  );
 }
 
 // ADMIN: SPIELER ALS NICHT BEZAHLT MARKIEREN
 async function markPlayerAsUnpaid(playerId, playerName) {
-  if (!IS_ADMIN) {
-    alert("Nur Admins können diese Aktion durchführen!");
-    return;
-  }
-  
-  if (!confirm(`Möchtest du ${playerName} für diese Woche als nicht bezahlt markieren?\n\nDer +2.000.000 $ Eintrag wird gelöscht!`)) {
-    return;
-  }
-  
-  try {
-    // 2.000.000 Eintrag finden und löschen
-    const { data: existingPayments } = await window.supabaseClient
-      .from("payments")
-      .select("*")
-      .eq("type", "beitrag")
-      .eq("amount", 2000000)
-      .eq("note", playerName)
-      .eq("week", SELECTED_WEEK || CURRENT_WEEK)
-      .order("created_at", { ascending: false })
-      .limit(1);
-      
-    if (existingPayments && existingPayments.length > 0) {
-      const paymentToDelete = existingPayments[0];
-      
-      // Mit RPC löschen (umgeht RLS)
-      const { error: deleteError } = await window.supabaseClient
-        .rpc('delete_payment_admin', { payment_id: paymentToDelete.id });
+  showConfirmModal(
+    "Spieler als nicht bezahlt markieren",
+    `Möchtest du ${playerName} für diese Woche wirklich als nicht bezahlt markieren?\n\nDer Status wird auf "Nicht bezahlt" gesetzt und der 2.000.000 $ Eintrag wird gelöscht.`,
+    "Ja, als nicht bezahlt markieren",
+    "Abbrechen",
+    async () => {
+      try {
+        // Sofortige UI-Aktualisierung - VOR der Datenbank-Operation
+        showNotification(`${playerName} wird als nicht bezahlt markiert...`, "info");
         
-      if (deleteError) {
-        // Fallback: Direktes Delete
-        const { error: fallbackError } = await window.supabaseClient
-          .from("payments")
-          .delete()
-          .eq("id", paymentToDelete.id);
-          
-        if (fallbackError) {
-          alert("Fehler beim Löschen des Eintrags: " + fallbackError.message);
-          return;
+        // Sofortige UI-Aktualisierung - Spieler-Status ändern
+        const allPlayers = document.querySelectorAll('.player');
+        allPlayers.forEach(player => {
+          if (player.dataset.playerName === playerName) {
+            player.classList.add('unpaid');
+            player.classList.remove('paid');
+            const statusElement = player.querySelector('small');
+            if (statusElement) {
+              statusElement.textContent = 'Nicht bezahlt';
+            }
+          }
+        });
+        
+        // Sofortige UI-Aktualisierung - entferne den Eintrag aus dem Archiv
+        const archiveEntries = document.querySelectorAll('.archive-entry');
+        archiveEntries.forEach(entry => {
+          const description = entry.querySelector('.description');
+          if (description && description.textContent.includes(`Wochenbeitrag · ${playerName}`)) {
+            entry.style.opacity = '0.5';
+            entry.style.transition = 'opacity 0.3s';
+            setTimeout(() => {
+              entry.remove();
+              // Wenn das Archiv jetzt leer ist, zeige "Keine Einträge" Nachricht
+              const archiveList = document.getElementById("archiveList");
+              if (archiveList && archiveList.children.length === 0) {
+                archiveList.innerHTML = '<div class="no-entries">Keine Einträge für diese Woche</div>';
+              }
+            }, 300);
+          }
+        });
+        
+        // Sofortige UI-Aktualisierung - Statuszeile und Footer
+        const paidCount = document.querySelectorAll('.player.paid').length;
+        const totalCount = document.querySelectorAll('.player').length;
+        
+        let statusClass = "";
+        if (paidCount === 0) {
+          statusClass = "status-red";
+        } else if (paidCount < totalCount) {
+          statusClass = "status-orange";
+        } else {
+          statusClass = "status-green";
         }
-      }
-    }
-    
-    // Spielerstatus aktualisieren
-    const { error: statusError } = await window.supabaseClient
-      .rpc('mark_player_as_unpaid', { player_uuid: playerId });
-      
-    if (statusError) {
-      // Fallback: Direktes Update
-      const { error: fallbackError } = await window.supabaseClient
-        .from("profiles")
-        .update({ payment_status: 0 })
-        .eq("id", playerId);
         
-      if (fallbackError) {
-        alert("Fehler beim Aktualisieren des Status: " + fallbackError.message);
-        return;
+        const statusLine = document.getElementById("statusLine");
+        if (statusLine) {
+          const statusText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+          statusLine.innerText = statusText;
+          statusLine.className = `status ${statusClass}`;
+        }
+        
+        const footer = document.querySelector('.footer');
+        if (footer) {
+          footer.textContent = `♥️ by Folte38 & TobiWanNoobie · Dashboard · Stand diese Woche · ${totalCount} Spieler`;
+        }
+        
+        // Jetzt die Datenbank-Operationen
+        // 2.000.000 Eintrag finden und löschen
+        const { data: existingPayments } = await window.supabaseClient
+          .from("payments")
+          .select("*")
+          .eq("type", "beitrag")
+          .eq("amount", 2000000)
+          .eq("note", playerName)
+          .eq("week", SELECTED_WEEK || CURRENT_WEEK)
+          .order("created_at", { ascending: false })
+          .limit(1);
+          
+        if (existingPayments && existingPayments.length > 0) {
+          const paymentToDelete = existingPayments[0];
+          
+          // Mit RPC löschen (umgeht RLS)
+          const { error: deleteError } = await window.supabaseClient
+            .rpc('delete_payment_admin', { payment_id: paymentToDelete.id });
+            
+          if (deleteError) {
+            // Fallback: Direktes Delete
+            const { error: fallbackError } = await window.supabaseClient
+              .from("payments")
+              .delete()
+              .eq("id", paymentToDelete.id);
+              
+            if (fallbackError) {
+              showNotification("Fehler beim Löschen des Eintrags: " + fallbackError.message, "error");
+              // UI bei Fehler wiederherstellen
+              loadPlayerPaymentStatus();
+              loadArchive();
+              return;
+            }
+          }
+        }
+        
+        // Spielerstatus aktualisieren
+        const { error: statusError } = await window.supabaseClient
+          .rpc('mark_player_as_unpaid', { player_uuid: playerId });
+          
+        if (statusError) {
+          // Fallback: Direktes Update
+          const { error: fallbackError } = await window.supabaseClient
+            .from("profiles")
+            .update({ payment_status: 0 })
+            .eq("id", playerId);
+            
+          if (fallbackError) {
+            showNotification("Fehler beim Aktualisieren des Status: " + fallbackError.message, "error");
+            // UI bei Fehler wiederherstellen
+            loadPlayerPaymentStatus();
+            return;
+          }
+        }
+        
+        showNotification(`${playerName} wurde erfolgreich als nicht bezahlt markiert!`, "success");
+        
+        // UI im Hintergrund aktualisieren (für Konsistenz)
+        Promise.all([
+          loadPlayerPaymentStatus(),
+          loadPaymentsFromDB(),
+          loadArchive()
+        ]).then(() => {
+          console.log("Hintergrund-Aktualisierung abgeschlossen");
+        });
+        
+      } catch (error) {
+        showNotification("Fehler: " + error.message, "error");
       }
     }
-    
-    alert(`${playerName} wurde erfolgreich als nicht bezahlt markiert!`);
-    
-    // UI aktualisieren
-    await Promise.all([
-      loadPlayerPaymentStatus(),
-      loadPaymentsFromDB(),
-      loadArchive()
-    ]);
-    
-  } catch (error) {
-    alert("Fehler: " + error.message);
-  }
+  );
 }
 
 // ARCHIV
@@ -473,64 +905,122 @@ async function loadArchive() {
 
 // ADMIN: ARCHIV-EINTRAG LÖSCHEN
 async function deleteArchiveEntry(paymentId, type, amount, note) {
-  if (!IS_ADMIN) {
-    alert("Nur Admins können diese Aktion durchführen!");
-    return;
-  }
+  console.log("deleteArchiveEntry aufgerufen mit:", { paymentId, type, amount, note });
   
   const typeLabel = type === "beitrag" ? "Wochenbeitrag" : type === "spende" ? "Spende" : "Ausgabe";
   const noteText = note ? ` (${note})` : "";
   
-  if (!confirm(`Möchtest du diesen Eintrag wirklich löschen?\n\n${typeLabel}${noteText}: ${amount.toLocaleString()} $`)) {
-    return;
-  }
-  
-  try {
-    // Mit RPC löschen
-    const { error } = await window.supabaseClient
-      .rpc('delete_payment_admin', { payment_id: paymentId });
-      
-    if (error) {
-      // Fallback: Direktes Delete
-      const { error: fallbackError } = await window.supabaseClient
-        .from("payments")
-        .delete()
-        .eq("id", paymentId);
+  showConfirmModal(
+    "Eintrag entfernen",
+    `Möchtest du diesen Eintrag wirklich entfernen?\n\n${typeLabel}${noteText}: ${amount.toLocaleString()} $`,
+    "Ja, entfernen",
+    "Abbrechen",
+    async () => {
+      try {
+        console.log("Lösche Eintrag:", { paymentId, type, amount, note });
         
-      if (fallbackError) {
-        alert("Fehler beim Löschen: " + fallbackError.message);
-        return;
+        // Sofortige UI-Aktualisierung - VOR der Datenbank-Operation
+        showNotification("Eintrag wird entfernt...", "info");
+        
+        // Sofortige UI-Aktualisierung - entferne den Eintrag direkt aus dem DOM
+        const deletedEntry = document.querySelector(`[data-payment-id="${paymentId}"]`);
+        console.log("Zu löschender Eintrag:", deletedEntry);
+        
+        if (deletedEntry) {
+          deletedEntry.style.opacity = '0.5';
+          deletedEntry.style.transition = 'opacity 0.3s';
+          setTimeout(() => {
+            deletedEntry.remove();
+            // Wenn das Archiv jetzt leer ist, zeige "Keine Einträge" Nachricht
+            const archiveList = document.getElementById("archiveList");
+            if (archiveList && archiveList.children.length === 0) {
+              archiveList.innerHTML = '<div class="no-entries">Keine Einträge für diese Woche</div>';
+            }
+          }, 300);
+        } else {
+          console.warn("Eintrag nicht gefunden für paymentId:", paymentId);
+        }
+        
+        // Wenn es ein Wochenbeitrag war, Spielerstatus sofort aktualisieren
+        if (type === "beitrag" && note) {
+          console.log("Aktualisiere Spielerstatus für:", note);
+          const allPlayers = document.querySelectorAll('.player');
+          allPlayers.forEach(player => {
+            if (player.dataset.playerName === note) {
+              player.classList.add('unpaid');
+              player.classList.remove('paid');
+              const statusElement = player.querySelector('small');
+              if (statusElement) {
+                statusElement.textContent = 'Nicht bezahlt';
+              }
+            }
+          });
+          
+          // Sofortige UI-Aktualisierung - Statuszeile und Footer
+          const paidCount = document.querySelectorAll('.player.paid').length;
+          const totalCount = document.querySelectorAll('.player').length;
+          
+          let statusClass = "";
+          if (paidCount === 0) {
+            statusClass = "status-red";
+          } else if (paidCount < totalCount) {
+            statusClass = "status-orange";
+          } else {
+            statusClass = "status-green";
+          }
+          
+          const statusLine = document.getElementById("statusLine");
+          if (statusLine) {
+            const statusText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+            statusLine.innerText = statusText;
+            statusLine.className = `status ${statusClass}`;
+          }
+          
+          const footer = document.querySelector('.footer');
+          if (footer) {
+            footer.textContent = `♥️ by Folte38 & TobiWanNoobie · Dashboard · Stand diese Woche · ${totalCount} Spieler`;
+          }
+        }
+        
+        // Jetzt die Datenbank-Operation
+        const { error } = await window.supabaseClient
+          .rpc('delete_payment_admin', { payment_id: paymentId });
+        
+        if (error) {
+          console.warn("RPC-Löschen fehlgeschlagen, versuche Direkt-Delete:", error);
+          // Fallback: Direktes Delete
+          const { error: fallbackError } = await window.supabaseClient
+            .from("payments")
+            .delete()
+            .eq("id", paymentId);
+          
+          if (fallbackError) {
+            console.error("Direkt-Delete fehlgeschlagen:", fallbackError);
+            showNotification("Fehler beim Löschen: " + fallbackError.message, "error");
+            // UI bei Fehler wiederherstellen
+            loadArchive();
+            return;
+          }
+        }
+        
+        console.log("Eintrag erfolgreich gelöscht");
+        showNotification("Eintrag wurde erfolgreich entfernt!", "success");
+        
+        // UI im Hintergrund aktualisieren (für Konsistenz)
+        Promise.all([
+          loadPaymentsFromDB(),
+          loadArchive(),
+          loadPlayerPaymentStatus()
+        ]).then(() => {
+          console.log("Hintergrund-Aktualisierung abgeschlossen");
+        });
+        
+      } catch (error) {
+        console.error("Unerwarteter Fehler beim Löschen:", error);
+        showNotification("Fehler: " + error.message, "error");
       }
     }
-    
-    // Wenn es ein Wochenbeitrag war, Spielerstatus aktualisieren
-    if (type === "beitrag" && note) {
-      const { data: profile } = await window.supabaseClient
-        .from("profiles")
-        .select("id")
-        .eq("mc_name", note)
-        .single();
-        
-      if (profile) {
-        await window.supabaseClient
-          .from("profiles")
-          .update({ payment_status: 0 })
-          .eq("id", profile.id);
-      }
-    }
-    
-    alert("Eintrag wurde erfolgreich gelöscht!");
-    
-    // UI aktualisieren
-    await Promise.all([
-      loadPaymentsFromDB(),
-      loadArchive(),
-      loadPlayerPaymentStatus()
-    ]);
-    
-  } catch (error) {
-    alert("Fehler: " + error.message);
-  }
+  );
 }
 
 // ARCHIV MODAL
@@ -616,207 +1106,84 @@ async function deleteGoal(goalId) {
   }
 }
 
-// EVENT LISTENER
-document.addEventListener("DOMContentLoaded", () => {
-  // Archiv Modal
-  const archiveAddBtn = document.getElementById("archiveAddBtn");
-  if (archiveAddBtn) {
-    archiveAddBtn.addEventListener("click", showArchiveModal);
+// =========================
+// MODAL FUNKTIONEN FÜR BESTÄTIGUNGEN
+// =========================
+function showConfirmModal(title, message, confirmText, cancelText, onConfirm) {
+  // Modal und Overlay erstellen, falls nicht vorhanden
+  let modal = document.getElementById('confirmModal');
+  let overlay = document.getElementById('confirmOverlay');
+  
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'confirmModal';
+    modal.className = 'confirm-modal';
+    modal.innerHTML = `
+      <div class="confirm-modal-content">
+        <h3 class="confirm-modal-title"></h3>
+        <div class="confirm-modal-message"></div>
+        <div class="confirm-modal-actions">
+          <button class="confirm-btn cancel-btn"></button>
+          <button class="confirm-btn confirm-btn-primary"></button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
   }
   
-  const closeArchiveModal = document.getElementById("closeArchiveModal");
-  if (closeArchiveModal) {
-    closeArchiveModal.addEventListener("click", hideArchiveModal);
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'confirmOverlay';
+    overlay.className = 'confirm-overlay';
+    document.body.appendChild(overlay);
   }
   
-  const archiveModal = document.getElementById("archiveModal");
-  if (archiveModal) {
-    archiveModal.addEventListener("click", (e) => {
-      if (e.target === archiveModal) {
-        hideArchiveModal();
-      }
-    });
-  }
+  // Modal-Inhalt setzen
+  modal.querySelector('.confirm-modal-title').textContent = title;
+  modal.querySelector('.confirm-modal-message').textContent = message;
+  modal.querySelector('.cancel-btn').textContent = cancelText || 'Abbrechen';
+  modal.querySelector('.confirm-btn-primary').textContent = confirmText || 'Bestätigen';
   
-  // Teamziele Modal
-  const goalAddBtn = document.getElementById("goalAddBtn");
-  if (goalAddBtn) {
-    goalAddBtn.addEventListener("click", showGoalModal);
-  }
+  // Event-Handler für Bestätigung
+  const confirmBtn = modal.querySelector('.confirm-btn-primary');
+  const cancelBtn = modal.querySelector('.cancel-btn');
   
-  const closeGoalModal = document.getElementById("closeGoalModal");
-  if (closeGoalModal) {
-    closeGoalModal.addEventListener("click", hideGoalModal);
-  }
+  const closeModal = () => {
+    modal.style.display = 'none';
+    overlay.style.display = 'none';
+  };
   
-  const goalModal = document.getElementById("goalModal");
-  if (goalModal) {
-    goalModal.addEventListener("click", (e) => {
-      if (e.target === goalModal) {
-        hideGoalModal();
-      }
-    });
-  }
+  const confirmHandler = () => {
+    closeModal();
+    if (onConfirm) onConfirm();
+  };
   
-  // ESC Taste
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      hideArchiveModal();
-      hideGoalModal();
+  const cancelHandler = () => {
+    closeModal();
+  };
+  
+  // Alte Event-Listener entfernen
+  confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+  cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+  
+  // Neue Event-Listener setzen
+  modal.querySelector('.confirm-btn-primary').addEventListener('click', confirmHandler);
+  modal.querySelector('.cancel-btn').addEventListener('click', cancelHandler);
+  overlay.addEventListener('click', cancelHandler);
+  
+  // ESC-Taste zum Schließen
+  const escHandler = (e) => {
+    if (e.key === 'Escape') {
+      cancelHandler();
+      document.removeEventListener('keydown', escHandler);
     }
-  });
+  };
+  document.addEventListener('keydown', escHandler);
   
-  // Spieler Click Handler
-  document.addEventListener("click", (e) => {
-    const playerBox = e.target.closest(".player.clickable");
-    if (playerBox && IS_ADMIN) {
-      const playerId = playerBox.dataset.playerId;
-      const playerName = playerBox.dataset.playerName;
-      const isPaid = playerBox.classList.contains("paid");
-      
-      if (isPaid) {
-        markPlayerAsUnpaid(playerId, playerName);
-      } else {
-        markPlayerAsPaid(playerId, playerName);
-      }
-    }
-  });
-  
-  // Archiv Formular
-  const archivePaymentForm = document.getElementById("archivePaymentForm");
-  if (archivePaymentForm) {
-    archivePaymentForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      
-      const { data: { user } } = await window.supabaseClient.auth.getUser();
-      if (!user) return;
-
-      const type = document.getElementById("archivePaymentType").value;
-      const amount = parseInt(document.getElementById("archivePaymentAmount").value);
-      const note = document.getElementById("archivePaymentNote").value;
-      const archivePaymentMsg = document.getElementById("archivePaymentMsg");
-
-      if (!amount || amount <= 0) {
-        archivePaymentMsg.innerText = "❌ Bitte gültigen Betrag eingeben";
-        return;
-      }
-
-      const { error } = await window.supabaseClient
-        .from("payments")
-        .insert([{
-          user_id: user.id,
-          type,
-          amount,
-          note,
-          week: SELECTED_WEEK || CURRENT_WEEK
-        }]);
-
-      if (error) {
-        archivePaymentMsg.innerText = error.message;
-      } else {
-        archivePaymentMsg.innerText = "✅ Eintrag gespeichert";
-        archivePaymentForm.reset();
-        loadPaymentsFromDB();
-        loadPlayerPaymentStatus();
-        loadArchive();
-        
-        setTimeout(() => {
-          hideArchiveModal();
-        }, 1000);
-      }
-    });
-  }
-  
-  // Kommentar-Sichtbarkeit
-  const archivePaymentTypeSelect = document.getElementById("archivePaymentType");
-  const archivePaymentNoteInput = document.getElementById("archivePaymentNote");
-
-  if (archivePaymentTypeSelect && archivePaymentNoteInput) {
-    function updateArchiveNoteVisibility() {
-      const type = archivePaymentTypeSelect.value;
-      archivePaymentNoteInput.style.display = (type === "spende" || type === "ausgabe") ? "block" : "none";
-      if (type === "beitrag") {
-        archivePaymentNoteInput.value = "";
-      }
-    }
-
-    archivePaymentTypeSelect.addEventListener("change", updateArchiveNoteVisibility);
-    updateArchiveNoteVisibility();
-  }
-  
-  // Teamziele Formular
-  const goalForm = document.getElementById("goalForm");
-  if (goalForm) {
-    goalForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      
-      const { data: { user } } = await window.supabaseClient.auth.getUser();
-      if (!user) return;
-
-      const name = document.getElementById("goalName").value;
-      const cost = parseInt(document.getElementById("goalCost").value);
-      const current = parseInt(document.getElementById("goalCurrent").value) || 0;
-      
-      const progress = Math.min(Math.max((current / cost) * 100, 0.01), 100);
-      
-      const goalMsg = document.getElementById("goalMsg");
-
-      if (!name || !cost || cost <= 0) {
-        goalMsg.innerText = "❌ Bitte alle Felder ausfüllen";
-        return;
-      }
-
-      let result;
-      if (EDITING_GOAL_ID) {
-        result = await window.supabaseClient
-          .from("team_goals")
-          .update({
-            name,
-            cost,
-            progress,
-            current_exact: current
-          })
-          .eq("id", EDITING_GOAL_ID);
-          
-        if (!result.error) {
-          goalMsg.innerText = "✅ Ziel aktualisiert";
-        }
-      } else {
-        result = await window.supabaseClient
-          .from("team_goals")
-          .insert([{
-            name,
-            cost,
-            progress,
-            current_exact: current,
-            created_by: user.id,
-            is_active: true
-          }]);
-          
-        if (!result.error) {
-          goalMsg.innerText = "✅ Ziel hinzugefügt";
-        }
-      }
-
-      if (result.error) {
-        goalMsg.innerText = result.error.message;
-      } else {
-        goalForm.reset();
-        
-        setTimeout(async () => {
-          await loadTeamGoals();
-        }, 100);
-        
-        setTimeout(() => {
-          hideGoalModal();
-        }, 1000);
-      }
-    });
-  }
-  
-  // Server Status
-  initializeServerStatus();
-});
+  // Modal anzeigen
+  modal.style.display = 'block';
+  overlay.style.display = 'block';
+}
 
 // SERVER STATUS
 function initializeServerStatus() {

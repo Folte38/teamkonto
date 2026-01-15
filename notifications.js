@@ -2,6 +2,49 @@
 // GEMEINSAME BENACHRICHTIGUNGS-FUNKTIONEN
 // =========================
 
+// Einfache Benachrichtigung anzeigen
+function showNotification(message, type = 'info') {
+  const existingNotification = document.querySelector('.simple-notification');
+  if (existingNotification) existingNotification.remove();
+  
+  const notification = document.createElement('div');
+  notification.className = `simple-notification ${type}`;
+  
+  notification.innerHTML = `
+    <div class="notification-message">${message}</div>
+  `;
+  
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    transform: translateX(0);
+    opacity: 1;
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Automatisch entfernen nach 3 Sekunden
+  setTimeout(() => {
+    notification.style.transform = 'translateX(400px)';
+    notification.style.opacity = '0';
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 300);
+  }, 3000);
+}
+
 // Benachrichtigung mit MC-Kopf anzeigen
 function showTeamNotification(mcName, message, type = 'info') {
   const existingNotification = document.querySelector('.team-notification');
