@@ -17,8 +17,8 @@ window.supabaseClient.auth.getSession().then(({ data }) => {
 // =========================
 // APP INITIALISIERUNG (wird nur bei eingeloggten Nutzern aufgerufen)
 // =========================
-function initializeApp() {
-  loadProfile();
+async function initializeApp() {
+  await loadProfile();
   loadWeeks();
   loadPaymentsFromDB();
   loadPlayerPaymentStatus();
@@ -140,8 +140,15 @@ async function loadTeamGoals() {
 // PROFIL & NAV
 // =========================
 async function loadProfile() {
+  console.log("🔍 loadProfile() wird aufgerufen...");
+  
   const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
+  if (!user) {
+    console.error("❌ Kein User gefunden!");
+    return;
+  }
+  
+  console.log("✅ User gefunden:", user.id);
 
   const { data: profile, error } = await window.supabaseClient
     .from("profiles")
@@ -149,9 +156,15 @@ async function loadProfile() {
     .eq("id", user.id)
     .single();
 
-  if (error || !profile) return;
+  console.log("🔍 Profil-Daten:", { profile, error });
+
+  if (error || !profile) {
+    console.error("❌ Fehler beim Laden des Profils:", error);
+    return;
+  }
 
   IS_ADMIN = profile.role === "admin";
+  console.log("✅ Admin-Status gesetzt:", IS_ADMIN, "für User:", profile.mc_name, "Role:", profile.role);
 
   const navUser = document.getElementById("navUser");
   const navUsername = document.getElementById("navUsername");
@@ -461,7 +474,7 @@ async function markPlayerAsPaid(playerId, playerName) {
     }, 200);
     
   } catch (error) {
-    console.error("❌ Unerwarteter Fehler:", error);
+    console.error("Unerwarteter Fehler:", error);
     alert("Fehler: " + error.message);
   }
 }
@@ -482,7 +495,45 @@ async function markPlayerAsUnpaid(playerId, playerName) {
   try {
     console.log("🗑️ Markiere Spieler als nicht bezahlt:", { playerId, playerName });
     
-    // Neue einfache Funktion aufrufen
+    // Zuerst den entsprechenden +2.000.000 Archiv-Eintrag finden und löschen
+    try {
+      console.log("🔍 Suche nach vorhandenem Archiv-Eintrag für Wochenbeitrag...");
+      
+      // Suche nach dem neuesten Wochenbeitrag-Eintrag des Spielers
+      const { data: existingPayments, error: searchError } = await window.supabaseClient
+        .from("payments")
+        .select("*")
+        .eq("type", "beitrag")
+        .eq("amount", 2000000)
+        .eq("note", playerName)
+        .eq("week", SELECTED_WEEK || CURRENT_WEEK)
+        .order("created_at", { ascending: false }) // Neueste zuerst
+        .limit(1); // Nur den neuesten
+        
+      console.log("🔍 Suchergebnis:", { existingPayments, searchError });
+      
+      if (existingPayments && existingPayments.length > 0 && !searchError) {
+        const paymentToDelete = existingPayments[0];
+        console.log("🗑️ Lösche nur den neuesten Archiv-Eintrag:", paymentToDelete.id);
+        
+        const { error: deleteError } = await window.supabaseClient
+          .from("payments")
+          .delete()
+          .eq("id", paymentToDelete.id);
+          
+        if (deleteError) {
+          console.error("❌ Fehler beim Löschen des Archiv-Eintrags:", deleteError);
+        } else {
+          console.log("✅ Neuester Archiv-Eintrag erfolgreich gelöscht:", paymentToDelete.id);
+        }
+      } else {
+        console.log("ℹ️ Kein entsprechender Archiv-Eintrag gefunden zum Löschen");
+      }
+    } catch (archiveError) {
+      console.error("❌ Fehler beim Suchen/Löschen des Archiv-Eintrags:", archiveError);
+    }
+    
+    // Dann den Spielerstatus aktualisieren
     const { data, error } = await window.supabaseClient
       .rpc('mark_player_as_unpaid', { player_uuid: playerId });
       
@@ -499,17 +550,20 @@ async function markPlayerAsUnpaid(playerId, playerName) {
     }
     
     // Erfolgsmeldung
-    alert(`${playerName} wurde erfolgreich als nicht bezahlt markiert!`);
+    alert(`${playerName} wurde erfolgreich als nicht bezahlt markiert! Der +2.000.000 $ Eintrag wurde entfernt.`);
     
     // SOFORT UI aktualisieren mit Cache-Busting
     console.log("🔄 SOFORT UI aktualisieren...");
     await loadPlayerPaymentStatus();
+    await loadPaymentsFromDB(); // Kontostand neu laden
+    await loadArchive(); // Archiv neu laden
     console.log("✅ UI sofort aktualisiert");
     
     // Zusätzlicher Reload nach 200ms für Sicherheit
     setTimeout(async () => {
       console.log("🔄 Zusätzlicher Reload...");
       await loadPlayerPaymentStatus();
+      await loadPaymentsFromDB(); // Kontostand erneut aktualisieren
       console.log("✅ Zusätzlicher Reload durchgeführt");
     }, 200);
     
@@ -518,42 +572,50 @@ async function markPlayerAsUnpaid(playerId, playerName) {
     alert("Fehler: " + error.message);
   }
 }
-
-// =========================
-// ARCHIV
-// =========================
 async function loadArchive() {
+  console.log("🔍 loadArchive() wird aufgerufen...");
+  console.log("🔍 IS_ADMIN:", IS_ADMIN);
+  console.log("🔍 SELECTED_WEEK:", SELECTED_WEEK);
+  console.log("🔍 CURRENT_WEEK:", CURRENT_WEEK);
+  
   const el = document.getElementById("archiveList");
-  if (!el) return;
+  if (!el) {
+    console.error("❌ archiveList Element nicht gefunden!");
+    return;
+  }
+
+  const targetWeek = SELECTED_WEEK && SELECTED_WEEK !== "" ? SELECTED_WEEK : CURRENT_WEEK;
+  console.log("🔍 Lade Archiv für Woche:", targetWeek);
 
   const { data, error } = await window.supabaseClient
     .from("payments")
     .select(`
+      id,
       type,
       amount,
       note,
       created_at,
       profiles ( mc_name )
     `)
-    .eq(
-      "week",
-      SELECTED_WEEK && SELECTED_WEEK !== ""
-        ? SELECTED_WEEK
-        : CURRENT_WEEK
-    )
+    .eq("week", targetWeek)
     .order("created_at", { ascending: false })
     .limit(15); // Etwas mehr Einträge für Scrollbarkeit
 
+  console.log("🔍 Archiv-Datenbank Ergebnis:", { data, error });
+
   if (error) {
-    console.error("Fehler beim Laden des Archivs:", error);
-    el.innerHTML = '<div class="no-entries">Keine Einträge gefunden</div>';
+    console.error("❌ Fehler beim Laden des Archivs:", error);
+    el.innerHTML = '<div class="no-entries">Fehler: ' + error.message + '</div>';
     return;
   }
 
   if (!data || data.length === 0) {
+    console.log("ℹ️ Keine Archiv-Einträge gefunden für Woche:", targetWeek);
     el.innerHTML = '<div class="no-entries">Keine Einträge für diese Woche</div>';
     return;
   }
+
+  console.log(`✅ ${data.length} Archiv-Einträge gefunden`);
 
   el.innerHTML = "";
 
@@ -566,16 +628,224 @@ async function loadArchive() {
       p.type === "spende" ? "Spende" :
       "Ausgabe";
 
+    // Escape single quotes in note to prevent JavaScript errors
+    const escapedNote = (p.note || '').replace(/'/g, "\\'");
+
     el.innerHTML += `
-      <div class="archive-entry ${cls}">
-        <div class="amount">${sign} ${p.amount.toLocaleString()} $</div>
-        <div class="description">${label}${p.note ? " · " + p.note : ""}</div>
-        <div class="meta">${p.profiles?.mc_name || "—"} • ${new Date(p.created_at).toLocaleDateString('de-DE')}</div>
+      <div class="archive-entry ${cls}" data-payment-id="${p.id}">
+        <div class="archive-content">
+          <div class="amount">${sign} ${p.amount.toLocaleString()} $</div>
+          <div class="description">${label}${p.note ? " · " + p.note : ""}</div>
+          <div class="meta">${p.profiles?.mc_name || "—"} • ${new Date(p.created_at).toLocaleDateString('de-DE')}</div>
+        </div>
+        ${IS_ADMIN ? `<div class="archive-actions"><button class="archive-delete-btn" onclick="deleteArchiveEntry('${p.id}', '${p.type}', ${p.amount}, '${escapedNote}')" title="Eintrag löschen">×</button></div>` : ''}
       </div>
     `;
   });
   
   // Container-Höhen werden nicht mehr angepasst
+}
+
+// =========================
+// DEBUG: MANUELLES ARCHIV-RELOAD
+// =========================
+async function debugReloadArchive() {
+  console.log("🔄 DEBUG: Manuelles Archiv-Reload wird gestartet...");
+  console.log("🔍 Vorheriger IS_ADMIN Status:", IS_ADMIN);
+  
+  // Profil neu laden um sicherzustellen, dass Admin-Status aktuell ist
+  await loadProfile();
+  
+  // Archiv neu laden
+  await loadArchive();
+  
+  console.log("✅ DEBUG: Manuelles Archiv-Reload abgeschlossen!");
+  console.log("🔍 Neuer IS_ADMIN Status:", IS_ADMIN);
+}
+
+// Globale Funktion für Browser-Konsole
+window.debugReloadArchive = debugReloadArchive;
+
+// =========================
+// DEBUG: ALLE ARCHIV-DATEN ANZEIGEN
+// =========================
+async function debugShowAllArchiveData() {
+  console.log("🔍 DEBUG: Zeige alle Archiv-Daten an...");
+  
+  const { data, error } = await window.supabaseClient
+    .from("payments")
+    .select(`
+      id,
+      type,
+      amount,
+      note,
+      week,
+      created_at,
+      profiles ( mc_name )
+    `)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  console.log("🔍 Alle Archiv-Daten:", { data, error });
+  
+  if (data && data.length > 0) {
+    console.log("📊 Gefundene Wochen:");
+    const weeks = [...new Set(data.map(d => d.week))];
+    console.log(weeks);
+    
+    console.log("📊 Einträge pro Woche:");
+    weeks.forEach(week => {
+      const weekData = data.filter(d => d.week === week);
+      console.log(`${week}: ${weekData.length} Einträge`, weekData);
+    });
+  } else {
+    console.log("❌ Keine Archiv-Daten gefunden");
+  }
+}
+
+// Globale Funktion für Browser-Konsole
+window.debugShowAllArchiveData = debugShowAllArchiveData;
+
+// =========================
+// DEBUG: FEHLENDE ARCHIV-EINTRÄGE ERSTELLEN
+// =========================
+async function debugCreateMissingArchiveEntries() {
+  console.log("🔧 DEBUG: Erstelle fehlende Archiv-Einträge...");
+  
+  // Alle bezahlten Spieler abrufen
+  const { data: profiles, error: profilesError } = await window.supabaseClient
+    .from("profiles")
+    .select("id, mc_name, payment_status")
+    .eq("payment_status", 1);
+    
+  if (profilesError || !profiles) {
+    console.error("❌ Fehler beim Laden der Profile:", profilesError);
+    return;
+  }
+  
+  console.log(`✅ ${profiles.length} bezahlte Spieler gefunden:`, profiles);
+  
+  // Für jeden bezahlten Spieler einen Archiv-Eintrag erstellen
+  for (const profile of profiles) {
+    console.log(`📝 Erstelle Archiv-Eintrag für ${profile.mc_name}...`);
+    
+    const { error: insertError } = await window.supabaseClient
+      .from("payments")
+      .insert([{
+        user_id: profile.id,
+        type: "beitrag",
+        amount: 2000000, // 2.000.000 $
+        note: profile.mc_name,
+        week: CURRENT_WEEK
+      }]);
+      
+    if (insertError) {
+      console.error(`❌ Fehler beim Erstellen des Eintrags für ${profile.mc_name}:`, insertError);
+    } else {
+      console.log(`✅ Archiv-Eintrag erstellt für ${profile.mc_name}`);
+    }
+  }
+  
+  console.log("🔄 Lade Archiv neu...");
+  await loadArchive();
+  console.log("✅ Fehlende Archiv-Einträge erstellt!");
+}
+
+// Globale Funktion für Browser-Konsole
+window.debugCreateMissingArchiveEntries = debugCreateMissingArchiveEntries;
+
+// =========================
+// DEBUG: BERECHTIGUNGSTEST
+// =========================
+async function debugTestPermissions() {
+  console.log("🔍 DEBUG: Teste Berechtigungen...");
+  
+  // Test 1: Einfache Zählung ohne Join
+  console.log("📊 Test 1: Einfache Zählung...");
+  const { data: countData, error: countError } = await window.supabaseClient
+    .from("payments")
+    .select("id", { count: "exact" });
+    
+  console.log("📊 Ergebnis Test 1:", { countData, countError });
+  
+  // Test 2: Mit Join aber ohne Filter
+  console.log("📊 Test 2: Mit Join ohne Filter...");
+  const { data: joinData, error: joinError } = await window.supabaseClient
+    .from("payments")
+    .select(`
+      id,
+      type,
+      amount,
+      note,
+      week,
+      created_at,
+      profiles ( mc_name )
+    `)
+    .order("created_at", { ascending: false })
+    .limit(5);
+    
+  console.log("📊 Ergebnis Test 2:", { joinData, joinError });
+  
+  // Test 3: Aktuelle User-Info
+  console.log("📊 Test 3: User-Info...");
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  console.log("📊 Aktueller User:", user);
+  
+  // Test 4: Profile-Info
+  console.log("📊 Test 4: Profile-Info...");
+  const { data: profileData, error: profileError } = await window.supabaseClient
+    .from("profiles")
+    .select("mc_name, role")
+    .eq("id", user.id)
+    .single();
+    
+  console.log("📊 Ergebnis Test 4:", { profileData, profileError });
+}
+
+// Globale Funktion für Browser-Konsole
+window.debugTestPermissions = debugTestPermissions;
+
+// =========================
+// ADMIN: ARCHIV-EINTRAG LÖSCHEN
+// =========================
+async function deleteArchiveEntry(paymentId, type, amount, note) {
+  if (!IS_ADMIN) {
+    alert("Nur Admins können diese Aktion durchführen!");
+    return;
+  }
+  
+  const typeLabel = type === "beitrag" ? "Wochenbeitrag" : type === "spende" ? "Spende" : "Ausgabe";
+  const noteText = note ? ` (${note})` : "";
+  
+  if (!confirm(`Möchtest du diesen Eintrag wirklich löschen?\n\n${typeLabel}${noteText}: ${amount.toLocaleString()} $`)) {
+    return;
+  }
+  
+  try {
+    console.log("🗑️ Lösche Archiv-Eintrag:", { paymentId, type, amount, note });
+    
+    const { error } = await window.supabaseClient
+      .from("payments")
+      .delete()
+      .eq("id", paymentId);
+      
+    if (error) {
+      console.error("❌ Fehler beim Löschen des Archiv-Eintrags:", error);
+      alert("Fehler beim Löschen: " + error.message);
+      return;
+    }
+    
+    console.log("✅ Archiv-Eintrag erfolgreich gelöscht");
+    alert("Eintrag wurde erfolgreich gelöscht!");
+    
+    // UI aktualisieren
+    await loadPaymentsFromDB(); // Kontostand neu laden
+    await loadArchive(); // Archiv neu laden
+    
+  } catch (error) {
+    console.error("Unerwarteter Fehler:", error);
+    alert("Fehler: " + error.message);
+  }
 }
 
 // =========================
@@ -930,32 +1200,175 @@ document.addEventListener("DOMContentLoaded", () => {
 // Die Login-Benachrichtigungen werden jetzt über notifications.js verwaltet
 
 // =========================
+// EVENT LISTENER SETUP
+// =========================
+function setupEventListeners() {
+  console.log("🔧 Event-Listeners werden eingerichtet...");
+  
+  // Wochen-Dropdown
+  const weekSelect = document.getElementById("weekSelect");
+  if (weekSelect) {
+    weekSelect.addEventListener("change", () => {
+      SELECTED_WEEK = weekSelect.value;
+      loadPaymentsFromDB();
+      loadPlayerPaymentStatus();
+      loadArchive();
+    });
+  }
+  
+  // Spieler-Box Click-Handler für Admins
+  document.addEventListener("click", (e) => {
+    const playerBox = e.target.closest(".player.clickable");
+    if (playerBox && IS_ADMIN) {
+      const playerId = playerBox.dataset.playerId;
+      const playerName = playerBox.dataset.playerName;
+      const isPaid = playerBox.classList.contains("paid");
+      
+      if (isPaid) {
+        markPlayerAsUnpaid(playerId, playerName);
+      } else {
+        markPlayerAsPaid(playerId, playerName);
+      }
+    }
+  });
+  
+  // Archiv-Modal Event Listener
+  const archiveAddBtn = document.getElementById("archiveAddBtn");
+  if (archiveAddBtn) {
+    archiveAddBtn.addEventListener("click", showArchiveModal);
+  }
+  
+  const closeArchiveModal = document.getElementById("closeArchiveModal");
+  if (closeArchiveModal) {
+    closeArchiveModal.addEventListener("click", hideArchiveModal);
+  }
+  
+  const archiveModal = document.getElementById("archiveModal");
+  if (archiveModal) {
+    archiveModal.addEventListener("click", (e) => {
+      if (e.target === archiveModal) {
+        hideArchiveModal();
+      }
+    });
+  }
+  
+  // Teamziele-Modal Event Listener
+  const goalAddBtn = document.getElementById("goalAddBtn");
+  if (goalAddBtn) {
+    goalAddBtn.addEventListener("click", showGoalModal);
+  }
+  
+  const closeGoalModal = document.getElementById("closeGoalModal");
+  if (closeGoalModal) {
+    closeGoalModal.addEventListener("click", hideGoalModal);
+  }
+  
+  const goalModal = document.getElementById("goalModal");
+  if (goalModal) {
+    goalModal.addEventListener("click", (e) => {
+      if (e.target === goalModal) {
+        hideGoalModal();
+      }
+    });
+  }
+  
+  // ESC-Taste zum Schließen von Modals
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      hideArchiveModal();
+      hideGoalModal();
+    }
+  });
+  
+  // Archiv-Formular
+  const archivePaymentForm = document.getElementById("archivePaymentForm");
+  if (archivePaymentForm) {
+    archivePaymentForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return;
+
+      const type = document.getElementById("archivePaymentType").value;
+      const amount = parseInt(document.getElementById("archivePaymentAmount").value);
+      const note = document.getElementById("archivePaymentNote").value;
+      const archivePaymentMsg = document.getElementById("archivePaymentMsg");
+
+      if (!amount || amount <= 0) {
+        archivePaymentMsg.innerText = "❌ Bitte gültigen Betrag eingeben";
+        return;
+      }
+
+      const { error } = await window.supabaseClient
+        .from("payments")
+        .insert([{
+          user_id: user.id,
+          type,
+          amount,
+          note,
+          week: SELECTED_WEEK || CURRENT_WEEK
+        }]);
+
+      if (error) {
+        archivePaymentMsg.innerText = error.message;
+      } else {
+        archivePaymentMsg.innerText = "✅ Eintrag gespeichert";
+        archivePaymentForm.reset();
+        loadPaymentsFromDB();
+        loadPlayerPaymentStatus();
+        loadArchive();
+        
+        setTimeout(() => {
+          hideArchiveModal();
+        }, 1000);
+      }
+    });
+  }
+  
+  // Kommentar-Sichtbarkeit für Archiv-Formular
+  const archivePaymentTypeSelect = document.getElementById("archivePaymentType");
+  const archivePaymentNoteInput = document.getElementById("archivePaymentNote");
+
+  if (archivePaymentTypeSelect && archivePaymentNoteInput) {
+    function updateArchiveNoteVisibility() {
+      const type = archivePaymentTypeSelect.value;
+
+      if (type === "spende" || type === "ausgabe") {
+        archivePaymentNoteInput.style.display = "block";
+      } else {
+        archivePaymentNoteInput.style.display = "none";
+        archivePaymentNoteInput.value = "";
+      }
+    }
+
+    archivePaymentTypeSelect.addEventListener("change", updateArchiveNoteVisibility);
+    updateArchiveNoteVisibility();
+  }
+  
+  console.log("✅ Event-Listeners eingerichtet");
+}
+
+// =========================
 // INIT - ANGEPASSTE VERSION
 // =========================
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("🚀 INIT wird ausgeführt...");
   
   // Warten auf Login-Check, dann initialisieren
-  setTimeout(() => {
+  setTimeout(async () => {
     const mainContent = document.getElementById('mainContent');
     if (mainContent && mainContent.style.display !== 'none') {
       // Nur initialisieren wenn eingeloggt und Hauptinhalt sichtbar
-      loadProfile();
+      await loadProfile();
       loadWeeks();
+      loadPaymentsFromDB();
+      loadPlayerPaymentStatus();
+      loadTeamGoals();
+      loadArchive();
       setupEventListeners();
+      console.log("✅ Alle Initialisierungen abgeschlossen!");
     }
   }, 100);
-  
-  loadPlayerPaymentStatus();
-  console.log("✅ loadPlayerPaymentStatus abgeschlossen");
-  
-  loadTeamGoals();
-  console.log("✅ loadTeamGoals aufgerufen");
-  
-  loadArchive();
-  console.log("✅ loadArchive abgeschlossen");
-  
-  console.log("🎯 Alle Initialisierungen abgeschlossen!");
   
   // Server-Status initialisieren
   initializeServerStatus();
