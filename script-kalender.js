@@ -87,7 +87,7 @@ let ALL_PLAYERS = [];
 let ALL_PROFILES = [];
 let CURRENT_DATE = new Date();
 let SELECTED_DATE = null;
-let SELECTED_PLAYER = null;
+let SELECTED_PLAYERS = new Set(); // Set für ausgewählte Spieler
 
 // =========================
 // PROFIL & NAV
@@ -229,19 +229,58 @@ async function loadPlayerForDate(dateString, dayElement) {
     
     if (entry) {
       dayElement.classList.add('has-player');
+      
+      // Prüfen ob Note JSON mit mehreren Spielern enthält
+      let players = [];
+      let note = '';
+      
+      try {
+        const noteData = JSON.parse(entry.note || '{}');
+        if (noteData.players && Array.isArray(noteData.players)) {
+          players = noteData.players;
+        }
+        if (noteData.text) {
+          note = noteData.text;
+        }
+      } catch (e) {
+        // Altes Format: einzelner Spieler in mc_name, Notiz in note
+        players = [entry.mc_name];
+        note = entry.note || '';
+      }
+      
       let dayHtml = `
         <div class="day-number">${dayElement.textContent}</div>
-        <div class="player-avatar">
-          <img src="https://mc-heads.net/avatar/${entry.mc_name}/24" 
-               alt="${entry.mc_name}" 
-               title="${entry.mc_name}">
-        </div>
+        <div class="player-avatars">
       `;
       
-      // Notiz anzeigen falls vorhanden
-      if (entry.note && entry.note.trim()) {
+      // Alle Spieler-Avatare anzeigen (max 3, dann "+X")
+      const displayPlayers = players.slice(0, 3);
+      const remainingCount = players.length - 3;
+      
+      displayPlayers.forEach(playerName => {
         dayHtml += `
-          <div class="day-note" title="${entry.note}">
+          <div class="player-avatar">
+            <img src="https://mc-heads.net/avatar/${playerName}/20" 
+                 alt="${playerName}" 
+                 title="${playerName}">
+          </div>
+        `;
+      });
+      
+      if (remainingCount > 0) {
+        dayHtml += `
+          <div class="player-avatar more-players" title="${players.slice(3).join(', ')}">
+            +${remainingCount}
+          </div>
+        `;
+      }
+      
+      dayHtml += `</div>`;
+      
+      // Notiz anzeigen falls vorhanden
+      if (note && note.trim()) {
+        dayHtml += `
+          <div class="day-note" title="${note}">
             📝
           </div>
         `;
@@ -256,12 +295,13 @@ async function loadPlayerForDate(dateString, dayElement) {
 
 async function openPlayerModal(date, dayElement) {
   SELECTED_DATE = date;
-  SELECTED_PLAYER = null;
+  SELECTED_PLAYERS.clear();
   
   const modal = document.getElementById('playerModal');
   const modalTitle = document.getElementById('modalTitle');
   const playerGrid = document.getElementById('playerGrid');
   const noteInput = document.getElementById('dayNote');
+  const selectedPlayersList = document.getElementById('selectedPlayersList');
   
   modalTitle.textContent = formatDateDisplay(date);
   
@@ -270,7 +310,8 @@ async function openPlayerModal(date, dayElement) {
   ALL_PROFILES.forEach(profile => {
     const playerItem = document.createElement('div');
     playerItem.className = 'player-select-item';
-    playerItem.dataset.player = profile.mc_name;
+    playerItem.dataset.playerId = profile.id;
+    playerItem.dataset.playerName = profile.mc_name;
     playerItem.innerHTML = `
       <img src="https://mc-heads.net/avatar/${profile.mc_name}/32" 
            alt="${profile.mc_name}" 
@@ -279,17 +320,13 @@ async function openPlayerModal(date, dayElement) {
     `;
     
     playerItem.addEventListener('click', () => {
-      document.querySelectorAll('.player-select-item').forEach(item => {
-        item.classList.remove('selected');
-      });
-      playerItem.classList.add('selected');
-      SELECTED_PLAYER = profile.mc_name;
+      togglePlayerSelection(profile.id, profile.mc_name, playerItem);
     });
     
     playerGrid.appendChild(playerItem);
   });
   
-  // Bestehenden Eintrag laden (falls vorhanden)
+  // Bestehende Einträge laden und vor-auswählen
   try {
     const dateString = formatDateForDB(date);
     const { data: entry } = await window.supabaseClient
@@ -299,39 +336,122 @@ async function openPlayerModal(date, dayElement) {
       .single();
     
     if (entry) {
+      let players = [];
+      let note = '';
+      
+      // Prüfen ob neues JSON-Format
+      try {
+        const noteData = JSON.parse(entry.note || '{}');
+        if (noteData.players && Array.isArray(noteData.players)) {
+          players = noteData.players;
+        }
+        if (noteData.text) {
+          note = noteData.text;
+        }
+      } catch (e) {
+        // Altes Format
+        players = [entry.mc_name];
+        note = entry.note || '';
+      }
+      
       // Spieler auswählen
-      document.querySelectorAll('.player-select-item').forEach(item => {
-        item.classList.remove('selected');
-        if (item.dataset.player === entry.mc_name) {
-          item.classList.add('selected');
-          SELECTED_PLAYER = entry.mc_name;
+      players.forEach(playerName => {
+        const profile = ALL_PROFILES.find(p => p.mc_name === playerName);
+        if (profile) {
+          SELECTED_PLAYERS.add(profile.id);
+          
+          // UI aktualisieren
+          const playerItem = document.querySelector(`[data-player-name="${playerName}"]`);
+          if (playerItem) {
+            playerItem.classList.add('selected');
+          }
         }
       });
       
       // Notiz eintragen
       if (noteInput) {
-        noteInput.value = entry.note || '';
+        noteInput.value = note || '';
       }
+      
+      // Ausgewählte Spieler anzeigen
+      updateSelectedPlayersList();
     } else {
       // Notiz leeren
       if (noteInput) {
         noteInput.value = '';
       }
+      selectedPlayersList.innerHTML = '<p class="no-players-selected">Noch keine Spieler ausgewählt</p>';
     }
   } catch (error) {
     // Kein Eintrag gefunden - Notiz leeren
     if (noteInput) {
       noteInput.value = '';
     }
+    selectedPlayersList.innerHTML = '<p class="no-players-selected">Noch keine Spieler ausgewählt</p>';
   }
   
   modal.style.display = 'flex';
 }
 
+function togglePlayerSelection(playerId, playerName, playerItem) {
+  if (SELECTED_PLAYERS.has(playerId)) {
+    SELECTED_PLAYERS.delete(playerId);
+    playerItem.classList.remove('selected');
+  } else {
+    SELECTED_PLAYERS.add(playerId);
+    playerItem.classList.add('selected');
+  }
+  
+  updateSelectedPlayersList();
+}
+
+function updateSelectedPlayersList() {
+  const selectedPlayersList = document.getElementById('selectedPlayersList');
+  
+  if (SELECTED_PLAYERS.size === 0) {
+    selectedPlayersList.innerHTML = '<p class="no-players-selected">Noch keine Spieler ausgewählt</p>';
+  } else {
+    selectedPlayersList.innerHTML = '';
+    SELECTED_PLAYERS.forEach(playerId => {
+      const profile = ALL_PROFILES.find(p => p.id === playerId);
+      if (profile) {
+        const playerChip = document.createElement('div');
+        playerChip.className = 'selected-player-chip';
+        playerChip.innerHTML = `
+          <img src="https://mc-heads.net/avatar/${profile.mc_name}/24" 
+               alt="${profile.mc_name}">
+          <span>${profile.mc_name}</span>
+          <button class="remove-player-chip" data-player-id="${playerId}" data-player-name="${profile.mc_name}">×</button>
+        `;
+        
+        // Remove-Button Event
+        const removeBtn = playerChip.querySelector('.remove-player-chip');
+        removeBtn.addEventListener('click', () => {
+          removePlayerFromSelection(playerId, profile.mc_name);
+        });
+        
+        selectedPlayersList.appendChild(playerChip);
+      }
+    });
+  }
+}
+
+function removePlayerFromSelection(playerId, playerName) {
+  SELECTED_PLAYERS.delete(playerId);
+  
+  // UI aktualisieren
+  const playerItem = document.querySelector(`[data-player-id="${playerId}"]`);
+  if (playerItem) {
+    playerItem.classList.remove('selected');
+  }
+  
+  updateSelectedPlayersList();
+}
+
 function closePlayerModal() {
   document.getElementById('playerModal').style.display = 'none';
   SELECTED_DATE = null;
-  SELECTED_PLAYER = null;
+  SELECTED_PLAYERS.clear();
 }
 
 // =========================
@@ -354,10 +474,10 @@ function setupEventListeners() {
   document.getElementById('cancelModal').addEventListener('click', closePlayerModal);
   
   // Speichern-Button
-  document.getElementById('savePlayer').addEventListener('click', savePlayerToCalendar);
+  document.getElementById('savePlayers').addEventListener('click', savePlayersToCalendar);
   
   // Entfernen-Button
-  document.getElementById('removePlayer').addEventListener('click', removePlayerFromCalendar);
+  document.getElementById('removePlayer').addEventListener('click', removePlayersFromCalendar);
   
   // Modal schließen wenn außerhalb geklickt wird
   document.getElementById('playerModal').addEventListener('click', (e) => {
@@ -377,9 +497,14 @@ function setupEventListeners() {
 // =========================
 // KALENDER DATENBANK OPERATIONEN
 // =========================
-async function savePlayerToCalendar() {
+async function savePlayersToCalendar() {
   if (!SELECTED_DATE) {
     alert('Kein Datum ausgewählt!');
+    return;
+  }
+  
+  if (SELECTED_PLAYERS.size === 0) {
+    alert('Bitte wähle mindestens einen Spieler aus!');
     return;
   }
   
@@ -387,6 +512,18 @@ async function savePlayerToCalendar() {
     const dateString = formatDateForDB(SELECTED_DATE);
     const noteInput = document.getElementById('dayNote');
     const note = noteInput ? noteInput.value.trim() : '';
+    
+    // Spieler-Informationen sammeln
+    const playerNames = Array.from(SELECTED_PLAYERS).map(id => {
+      const profile = ALL_PROFILES.find(p => p.id === id);
+      return profile ? profile.mc_name : '';
+    }).filter(name => name);
+    
+    // JSON-Format für Note erstellen
+    const noteData = {
+      players: playerNames,
+      text: note
+    };
     
     // Prüfen ob bereits ein Eintrag existiert
     const { data: existing } = await window.supabaseClient
@@ -397,42 +534,28 @@ async function savePlayerToCalendar() {
     
     if (existing) {
       // Bestehenden Eintrag aktualisieren
-      if (SELECTED_PLAYER) {
-        await window.supabaseClient
-          .from("kalender_eintraege")
-          .update({ 
-            mc_name: SELECTED_PLAYER,
-            note: note 
-          })
-          .eq("date", dateString);
-      } else {
-        // Nur Notiz aktualisieren
-        await window.supabaseClient
-          .from("kalender_eintraege")
-          .update({ note: note })
-          .eq("date", dateString);
-      }
+      await window.supabaseClient
+        .from("kalender_eintraege")
+        .update({ 
+          mc_name: playerNames[0] || '', // Erster Spieler für mc_name (Kompatibilität)
+          note: JSON.stringify(noteData)
+        })
+        .eq("date", dateString);
     } else {
-      // Neuen Eintrag erstellen (nur wenn Spieler ausgewählt)
-      if (SELECTED_PLAYER) {
-        await window.supabaseClient
-          .from("kalender_eintraege")
-          .insert([{ 
-            date: dateString, 
-            mc_name: SELECTED_PLAYER,
-            note: note 
-          }]);
-      } else {
-        alert('Bitte wähle einen Spieler aus!');
-        return;
-      }
+      // Neuen Eintrag erstellen
+      await window.supabaseClient
+        .from("kalender_eintraege")
+        .insert([{ 
+          date: dateString, 
+          mc_name: playerNames[0] || '', // Erster Spieler für mc_name
+          note: JSON.stringify(noteData),
+          created_by: CURRENT_USER_ID
+        }]);
     }
     
     // Benachrichtigung
     if (window.showTeamNotification) {
-      const message = SELECTED_PLAYER 
-        ? `${SELECTED_PLAYER} für ${formatDateDisplay(SELECTED_DATE)} eingetragen${note ? ' (mit Notiz)' : ''}`
-        : `Notiz für ${formatDateDisplay(SELECTED_DATE)} aktualisiert`;
+      const message = `${playerNames.length} Spieler für ${formatDateDisplay(SELECTED_DATE)} eingetragen${note ? ' (mit Notiz)' : ''}`;
       
       window.showTeamNotification(
         CURRENT_MC_NAME,
@@ -450,34 +573,127 @@ async function savePlayerToCalendar() {
   }
 }
 
-async function removePlayerFromCalendar() {
+async function removePlayersFromCalendar() {
   if (!SELECTED_DATE) {
     alert('Kein Datum ausgewählt!');
+    return;
+  }
+  
+  if (SELECTED_PLAYERS.size === 0) {
+    alert('Keine Spieler zum Entfernen ausgewählt!');
     return;
   }
   
   try {
     const dateString = formatDateForDB(SELECTED_DATE);
     
-    await window.supabaseClient
-      .from("kalender_eintraege")
-      .delete()
-      .eq("date", dateString);
+    console.log('🗑️ SPIELER ENTFERNEN GESTARTET:', {
+      dateString,
+      selectedPlayerIds: Array.from(SELECTED_PLAYERS)
+    });
     
-    // Benachrichtigung
-    if (window.showTeamNotification) {
-      window.showTeamNotification(
-        CURRENT_MC_NAME,
-        `Eintrag für ${formatDateDisplay(SELECTED_DATE)} entfernt`,
-        'info'
+    // Aktuelle Einträge holen
+    const { data: existing } = await window.supabaseClient
+      .from("kalender_eintraege")
+      .select("note")
+      .eq("date", dateString)
+      .single();
+    
+    console.log('📋 AKTUELLE EINTRÄGE:', existing);
+    
+    if (existing && existing.note) {
+      let currentPlayers = [];
+      let currentNote = '';
+      
+      try {
+        const noteData = JSON.parse(existing.note);
+        currentPlayers = noteData.players || [];
+        currentNote = noteData.text || '';
+        
+        console.log('📝 GEFUNDENE SPIELER:', currentPlayers);
+      } catch (e) {
+        // Altes Format - nicht unterstützt
+        alert('Entfernen von Spielern wird nur bei neuen Einträgen unterstützt.');
+        return;
+      }
+      
+      // Verbleibende Spieler berechnen
+      const selectedPlayerNames = Array.from(SELECTED_PLAYERS).map(id => {
+        const profile = ALL_PROFILES.find(p => p.id === id);
+        return profile ? profile.mc_name : '';
+      }).filter(name => name);
+      
+      console.log('🎯 AUSGEWÄHLTE SPIELER:', selectedPlayerNames);
+      
+      const remainingPlayerNames = currentPlayers.filter(name => 
+        !selectedPlayerNames.includes(name)
       );
+      
+      console.log('✅ VERBLEIBENDE SPIELER:', remainingPlayerNames);
+      
+      if (remainingPlayerNames.length > 0) {
+        // Eintrag mit verbleibenden Spielern aktualisieren
+        const updatedNoteData = {
+          players: remainingPlayerNames,
+          text: currentNote
+        };
+        
+        console.log('🔄 AKTUALISIERE EINTRAG:', updatedNoteData);
+        
+        const { error: updateError } = await window.supabaseClient
+          .from("kalender_eintraege")
+          .update({
+            mc_name: remainingPlayerNames[0], // Erster Spieler für Kompatibilität
+            note: JSON.stringify(updatedNoteData)
+          })
+          .eq("date", dateString);
+          
+        if (updateError) {
+          console.error('❌ FEHLER BEIM UPDATE:', updateError);
+          alert('Fehler beim Aktualisieren: ' + updateError.message);
+          return;
+        }
+        
+        console.log('✅ EINTRAG ERFOLGREICH AKTUALISIERT');
+      } else {
+        // Kompletten Eintrag löschen
+        console.log('🗑️ LÖSCHE KOMPLETTEN EINTRAG');
+        
+        const { error: deleteError } = await window.supabaseClient
+          .from("kalender_eintraege")
+          .delete()
+          .eq("date", dateString);
+          
+        if (deleteError) {
+          console.error('❌ FEHLER BEIM LÖSCHEN:', deleteError);
+          alert('Fehler beim Löschen: ' + deleteError.message);
+          return;
+        }
+        
+        console.log('✅ EINTRAG ERFOLGREICH GELÖSCHT');
+      }
+      
+      // Benachrichtigung
+      if (window.showTeamNotification) {
+        const removedCount = SELECTED_PLAYERS.size;
+        window.showTeamNotification(
+          CURRENT_MC_NAME,
+          `${removedCount} Spieler von ${formatDateDisplay(SELECTED_DATE)} entfernt`,
+          'info'
+        );
+      }
+      
+      closePlayerModal();
+      renderKalender();
+      
+      console.log('🔄 UI AKTUALISIERT');
+      
+    } else {
+      console.log('⚠️ KEINE EINTRÄGE FÜR DATUM GEFUNDEN');
     }
     
-    closePlayerModal();
-    renderKalender();
-    
   } catch (error) {
-    console.error('Fehler beim Entfernen:', error);
+    console.error('❌ UNERWARTETER FEHLER BEIM ENTFERNEN:', error);
     alert('Fehler beim Entfernen: ' + error.message);
   }
 }

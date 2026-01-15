@@ -79,7 +79,7 @@
   <div class="kalender-header">
     <div class="kalender-title">
       <h2>📅 Team Kalender</h2>
-      <p class="kalender-subtitle">Trage dich für Tage ein</p>
+      <p class="kalender-subtitle">Mehrere Spieler pro Tag möglich</p>
     </div>
     
     <div class="kalender-controls">
@@ -119,10 +119,17 @@
       </div>
       
       <div class="modal-body">
-        <p class="modal-subtitle">Wähle einen Spieler für diesen Tag:</p>
+        <p class="modal-subtitle">Wähle Spieler für diesen Tag:</p>
         
         <div class="player-grid" id="playerGrid">
           <!-- Spieler werden per JavaScript geladen -->
+        </div>
+        
+        <div class="selected-players-section">
+          <h4>👥 Ausgewählte Spieler:</h4>
+          <div class="selected-players-list" id="selectedPlayersList">
+            <!-- Ausgewählte Spieler werden hier angezeigt -->
+          </div>
         </div>
         
         <div class="note-section">
@@ -131,8 +138,8 @@
         </div>
         
         <div class="modal-actions">
-          <button id="savePlayer" class="btn-primary">Speichern</button>
-          <button id="removePlayer" class="btn-secondary">Entfernen</button>
+          <button id="savePlayers" class="btn-primary">Speichern</button>
+          <button id="removePlayer" class="btn-secondary">Spieler entfernen</button>
           <button id="cancelModal" class="btn-cancel">Abbrechen</button>
         </div>
       </div>

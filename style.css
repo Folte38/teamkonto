@@ -4642,20 +4642,59 @@ div.confirm-modal {
 /* Modal Actions */
 .confirm-modal-actions {
   display: flex;
-  gap: 12px;
-  justify-content: center;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 
-/* Modal Buttons */
-.confirm-btn {
-  padding: 12px 24px;
-  border-radius: 12px;
+.modal-actions button {
+  padding: 10px 20px;
   border: none;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  min-width: 100px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn-primary {
+  background: #4CAF50;
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
 }
 
 .cancel-btn {
@@ -5278,54 +5317,73 @@ div.confirm-modal {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  align-items: baseline;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-  border: none;
+  background: #4CAF50;
   color: white;
   padding: 10px 20px;
+  border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #45a049, #4CAF50);
-  transform: translateY(-2px);
+  background: #45a049;
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #ff6b6b, #ee5a24);
-  border: none;
+  background: #ff6b6b;
   color: white;
+  border: none;
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-secondary:hover {
-  background: linear-gradient(135deg, #ee5a24, #ff6b6b);
-  transform: translateY(-2px);
+  background: #ee5a24;
+  transform: translateY(-1px);
 }
 
 .btn-cancel {
   background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
   font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  min-width: 120px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn-cancel:hover {
   background: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 /* =========================
@@ -5446,6 +5504,246 @@ div.confirm-modal {
 .nav-link.active[href="kalender.html"] {
   color: #fff !important;
   background: rgba(76, 175, 80, 0.3) !important;
+}
+
+/* =========================
+   KALENDER MEHRPERSONEN STYLES
+   ========================= */
+
+/* Mehrere Spieler-Avatare im Kalendertag */
+.player-avatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.player-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.player-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.more-players {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Ausgewählte Spieler Section */
+.selected-players-section {
+  margin: 20px 0;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.selected-players-section h4 {
+  margin: 0 0 10px 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.selected-players-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
+  align-items: center;
+}
+
+.no-players-selected {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-style: italic;
+  margin: 0;
+}
+
+/* Spieler-Chips */
+.selected-player-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 4px 8px 4px 4px;
+  color: white;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.selected-player-chip:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.selected-player-chip img {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.selected-player-chip span {
+  font-weight: 500;
+}
+
+.remove-player-chip {
+  background: rgba(255, 67, 54, 0.8);
+  border: none;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  color: white;
+  transition: all 0.2s ease;
+  margin-left: 2px;
+}
+
+.remove-player-chip:hover {
+  background: rgba(255, 67, 54, 1);
+  transform: scale(1.1);
+}
+
+/* Player Selection Items mit Mehrfach-Auswahl */
+.player-select-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.player-select-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.player-select-item.selected {
+  background: rgba(76, 175, 80, 0.2);
+  border-color: #4CAF50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.player-select-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.player-select-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-select-name {
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* Kalendertage mit mehreren Spielern */
+.kalender-day.has-player {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.3), rgba(33, 150, 243, 0.3));
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.kalender-day.has-player:hover {
+  background: linear-gradient(135deg, rgba(76, 175, 80, 0.4), rgba(33, 150, 243, 0.4));
+  transform: translateY(-2px);
+}
+
+/* Modal Anpassungen für Mehrpersonen */
+.kalender-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-body {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+/* Responsive Anpassungen */
+@media (max-width: 768px) {
+  .player-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+  
+  .selected-players-list {
+    min-height: 40px;
+  }
+  
+  .selected-player-chip {
+    font-size: 11px;
+    padding: 3px 6px 3px 3px;
+  }
+  
+  .selected-player-chip img {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .remove-player-chip {
+    width: 14px;
+    height: 14px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .player-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .player-select-item {
+    padding: 10px;
+  }
+  
+  .player-select-avatar {
+    width: 28px;
+    height: 28px;
+  }
+  
+  .player-select-name {
+    font-size: 13px;
+  }
 }
 
 /* Regeln-Button speziell behandeln */
