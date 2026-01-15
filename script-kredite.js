@@ -1,54 +1,83 @@
 // =========================
-// GLOBALE VARIABLEN
+// KOMPLETT NEUES KREDITSYSTEM (FIXED)
 // =========================
 let CURRENT_USER_ID = null;
 let CURRENT_MC_NAME = null;
 let SELECTED_CREDIT_ID = null;
-let TOTAL_MEMBERS = 0; // Gesamtanzahl der Mitglieder
-let IS_ADMIN = false; // Wird in loadProfile() gesetzt
+let TOTAL_MEMBERS = 0;
 
 // =========================
 // MITGLIEDERANZAHL LADEN
 // =========================
 async function loadTotalMembers() {
-  const { data: profiles } = await window.supabaseClient
-    .from("profiles")
-    .select("id");
-  
-  TOTAL_MEMBERS = profiles ? profiles.length : 0;
-  console.log(`Gesamtmitglieder: ${TOTAL_MEMBERS}`);
+  try {
+    const { data: profiles } = await window.supabaseClient
+      .from("profiles")
+      .select("id");
+    
+    TOTAL_MEMBERS = profiles ? profiles.length : 0;
+    console.log("Gesamtmitglieder: " + TOTAL_MEMBERS);
+  } catch (error) {
+    console.error("Fehler beim Laden der Mitgliederanzahl:", error);
+    TOTAL_MEMBERS = 3; // Fallback
+  }
 }
 
 // =========================
-// PROFIL & NAV
+// PROFIL & NAVIGATION
 // =========================
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) return;
 
-  CURRENT_USER_ID = user.id;
+    CURRENT_USER_ID = user.id;
 
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name")
-    .eq("id", user.id)
-    .single();
+    const { data: profile } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name")
+      .eq("id", user.id)
+      .single();
 
-  if (!profile) return;
+    if (!profile) return;
 
-  CURRENT_MC_NAME = profile.mc_name;
+    CURRENT_MC_NAME = profile.mc_name;
 
-  // Navigation anzeigen
-  const navUser = document.getElementById("navUser");
-  if (navUser) {
-    document.getElementById("navUsername").innerText = profile.mc_name;
-    document.getElementById("navAvatar").src =
-      `https://mc-heads.net/avatar/${profile.mc_name}/64`;
-    navUser.style.display = "flex";
+    // Navigation anzeigen
+    const navUser = document.getElementById("navUser");
+    if (navUser) {
+      document.getElementById("navUsername").innerText = profile.mc_name;
+      document.getElementById("navAvatar").src =
+        "https://mc-heads.net/avatar/" + profile.mc_name + "/64";
+      navUser.style.display = "flex";
+    }
+
+    // Formular vorausfüllen
+    const creditUser = document.getElementById("creditUser");
+    if (creditUser) {
+      creditUser.value = profile.mc_name;
+    }
+
+    // Logout-Button anzeigen
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+      logoutBtn.style.display = "block";
+    }
+  } catch (error) {
+    console.error("Fehler beim Laden des Profils:", error);
   }
+}
 
-  // Formular vorausfüllen
-  document.getElementById("creditUser").value = profile.mc_name;
+// =========================
+// LOGOUT FUNKTION
+// =========================
+async function logout() {
+  try {
+    await window.supabaseClient.auth.signOut();
+    window.location.href = "index.html";
+  } catch (error) {
+    console.error("Fehler beim Logout:", error);
+  }
 }
 
 // =========================
@@ -59,9 +88,9 @@ async function loadCredits() {
   if (!list) return;
 
   try {
-    // Einfache Abfrage ohne komplexe JOINs
+    // Einfache Abfrage - NEUE TABELLEN
     const { data: requests } = await window.supabaseClient
-      .from("credit_requests")
+      .from("credit_requests_new")
       .select(`
         id,
         purpose,
@@ -75,8 +104,7 @@ async function loadCredits() {
       `)
       .order("created_at", { ascending: false });
 
-    if (!requests) {
-      console.log("Keine Kreditanträge gefunden");
+    if (!requests || requests.length === 0) {
       list.innerHTML = '<div class="no-requests">Keine Kreditanträge gefunden</div>';
       await calculateStats([]);
       return;
@@ -87,9 +115,9 @@ async function loadCredits() {
       .from("profiles")
       .select("id, mc_name");
 
-    // Votes separat laden
+    // Votes separat laden - NEUE TABELLE
     const { data: votes } = await window.supabaseClient
-      .from("credit_votes")
+      .from("credit_votes_new")
       .select("request_id, user_id, vote");
 
     // Daten zusammenfügen
@@ -99,7 +127,7 @@ async function loadCredits() {
       
       return {
         ...request,
-        mc_name: profile?.mc_name || "Unbekannt",
+        mc_name: profile ? profile.mc_name : "Unbekannt",
         credit_votes: requestVotes
       };
     });
@@ -115,7 +143,7 @@ async function loadCredits() {
         if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
           const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
           await window.supabaseClient
-            .from("credit_requests")
+            .from("credit_requests_new")
             .update({ status: newStatus })
             .eq("id", request.id);
           
@@ -128,6 +156,7 @@ async function loadCredits() {
     // Statistiken berechnen
     await calculateStats(requestsWithDetails);
 
+    // Anträge anzeigen
     list.innerHTML = "";
 
     // Offene Anträge zuerst anzeigen
@@ -135,55 +164,68 @@ async function loadCredits() {
     const otherRequests = requestsWithDetails.filter(r => r.status !== "open");
     const allRequests = [...openRequests, ...otherRequests];
 
-allRequests.forEach(r => {
-  const yes = r.credit_votes.filter(v => v.vote === "yes").length;
-  const no = r.credit_votes.filter(v => v.vote === "no").length;
-  const totalVotes = yes + no;
-  const remainingVotes = TOTAL_MEMBERS - totalVotes;
-  
-  // Status auf Deutsch übersetzen - einheitliche Schreibweise
-  let statusText = "";
-  let statusClass = "";
-  switch(r.status) {
-    case "open": statusText = "OFFEN"; statusClass = "open"; break;
-    case "accepted": statusText = "ANGENOMMEN"; statusClass = "accepted"; break;
-    case "rejected": statusText = "ABGELEHNT"; statusClass = "rejected"; break;
-    default: statusText = r.status.toUpperCase(); statusClass = r.status;
+    allRequests.forEach(r => {
+      const yes = r.credit_votes.filter(v => v.vote === "yes").length;
+      const no = r.credit_votes.filter(v => v.vote === "no").length;
+      const totalVotes = yes + no;
+      
+      // Status auf Deutsch übersetzen
+      let statusText = "";
+      let statusClass = "";
+      switch(r.status) {
+        case "open": statusText = "OFFEN"; statusClass = "open"; break;
+        case "accepted": statusText = "ANGENOMMEN"; statusClass = "accepted"; break;
+        case "rejected": statusText = "ABGELEHNT"; statusClass = "rejected"; break;
+        default: statusText = r.status.toUpperCase(); statusClass = r.status;
+      }
+
+      // Klick-Event für Kredit-Box
+      const onclick = r.status === "open" ? "selectCredit('" + r.id + "')" : "";
+
+      // Voting-Status anzeigen (nur für offene Anträge)
+      let votingStatus = "";
+      if (r.status === "open") {
+        if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
+          // Alle haben abgestimmt - zeige Ergebnis
+          const majority = yes > no ? "👍 Mehrheit dafür" : yes < no ? "👎 Mehrheit dagegen" : "⚖️ Unentschieden";
+          votingStatus = '<div class="voting-complete">✅ ' + yes + ' 👍 | ' + no + ' 👎 - ' + majority + '</div>';
+        } else {
+          votingStatus = '<div class="voting-progress">🗳️ ' + totalVotes + '/' + TOTAL_MEMBERS + ' abgestimmt (' + yes + ' 👍 | ' + no + ' 👎)</div>';
+        }
+      }
+
+      list.innerHTML += 
+        '<div class="credit-box ' + r.status + '" onclick="' + onclick + '" style="' + (r.status === 'open' ? 'cursor: pointer;' : '') + '">' +
+          '<div class="credit-box-header">' +
+            '<h3>📄 ' + r.purpose + '</h3>' +
+            '<div class="credit-status-badge">' + statusText + '</div>' +
+          '</div>' +
+          '<div class="credit-meta">' +
+            '<div><strong>👤 Antragsteller:</strong> ' + r.mc_name + '</div>' +
+            '<div><strong>💰 Gesamtpreis:</strong> ' + r.total_price.toLocaleString() + ' $</div>' +
+            '<div><strong>💳 Kreditbetrag:</strong> ' + r.credit_amount.toLocaleString() + ' $</div>' +
+            '<div><strong>📆 Rückzahlung:</strong> ' + r.repayment + '</div>' +
+          '</div>' +
+          votingStatus +
+          (r.reason ? '<p class="credit-reason"><strong>📝 Begründung:</strong> ' + r.reason + '</p>' : '') +
+        '</div>';
+    });
+  } catch (error) {
+    console.error("Fehler beim Laden der Kreditanträge:", error);
+    list.innerHTML = '<div class="error">Fehler beim Laden der Kreditanträge</div>';
   }
+}
 
-  // Klick-Event für Kredit-Box
-  const onclick = r.status === "open" ? `selectCredit('${r.id}')` : "";
-
-  // Voting-Status anzeigen (nur für offene Anträge)
-  let votingStatus = "";
-  if (r.status === "open") {
-    if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
-      // Alle haben abgestimmt - zeige Ergebnis
-      const majority = yes > no ? "👍 Mehrheit dafür" : yes < no ? "👎 Mehrheit dagegen" : "⚖️ Unentschieden";
-      votingStatus = `<div class="voting-complete">✅ ${yes} 👍 | ${no} 👎 - ${majority}</div>`;
-    } else {
-      votingStatus = `<div class="voting-progress">🗳️ ${totalVotes}/${TOTAL_MEMBERS} abgestimmt (${yes} 👍 | ${no} 👎)</div>`;
-    }
-  }
-
-  list.innerHTML += `
-    <div class="credit-box ${r.status}" onclick="${onclick}" style="${r.status === 'open' ? 'cursor: pointer;' : ''}">
-      <div class="credit-box-header">
-        <h3>📄 ${r.purpose}</h3>
-        <div class="credit-status-badge">${statusText}</div>
-      </div>
-
-      <div class="credit-meta">
-        <div><strong>👤 Antragsteller:</strong> ${r.mc_name}</div>
-        <div><strong>💰 Gesamtpreis:</strong> ${r.total_price.toLocaleString()} $</div>
+// =========================
+// KREDIT AUSWÄHLEN FÜR ABSTIMMUNG
 // =========================
 async function selectCredit(creditId) {
   SELECTED_CREDIT_ID = creditId;
   
   try {
-    // Einfache Abfrage ohne komplexe JOINs
+    // Einfache Abfrage - NEUE TABELLEN
     const { data: credit } = await window.supabaseClient
-      .from("credit_requests")
+      .from("credit_requests_new")
       .select(`
         id,
         purpose,
@@ -205,13 +247,13 @@ async function selectCredit(creditId) {
       return;
     }
 
-    // Profile und Votes separat laden
+    // Profile und Votes separat laden - NEUE TABELLE
     const { data: profiles } = await window.supabaseClient
       .from("profiles")
       .select("id, mc_name");
 
     const { data: votes } = await window.supabaseClient
-      .from("credit_votes")
+      .from("credit_votes_new")
       .select("request_id, user_id, vote")
       .eq("request_id", creditId);
 
@@ -230,140 +272,152 @@ async function selectCredit(creditId) {
 
     // Modal anzeigen
     const votingModal = document.getElementById("votingModal");
-    votingModal.style.display = "flex";
+    if (votingModal) {
+      votingModal.style.display = "flex";
 
-    // Daten einfügen
-    document.getElementById("selectedCreditPurpose").textContent = credit.purpose;
-    document.getElementById("selectedCreditAmount").textContent = credit.credit_amount.toLocaleString();
-    document.getElementById("selectedCreditTotal").textContent = credit.total_price.toLocaleString();
-    document.getElementById("selectedCreditRepayment").textContent = credit.repayment;
-    document.getElementById("selectedCreditUser").textContent = profile?.mc_name || "Unbekannt";
-    
-    // Begründung anzeigen falls vorhanden
-    const reasonEl = document.getElementById("selectedCreditReason");
-    if (credit.reason) {
-      reasonEl.textContent = credit.reason;
-      reasonEl.style.display = "block";
-    } else {
-      reasonEl.style.display = "none";
-    }
-
-    // Einfache Stimmenanzeige statt Progressbar
-    const remainingVotes = TOTAL_MEMBERS - totalVotes;
-    const voteStatusText = totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0 
-      ? `${yes} 👍 | ${no} 👎 - Alle ${TOTAL_MEMBERS} haben abgestimmt`
-      : `${yes} 👍 | ${no} 👎 (${totalVotes}/${TOTAL_MEMBERS} abgestimmt, ${remainingVotes} fehlen)`;
-    
-    document.getElementById("voteText").textContent = voteStatusText;
-
-    // Automatische Auswertung wenn alle abgestimmt haben
-    if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
-      // Automatisch nach Mehrheit entscheiden
-      const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
-      await window.supabaseClient
-        .from("credit_requests")
-        .update({ status: newStatus })
-        .eq("id", creditId);
+      // Daten einfügen
+      const selectedCreditPurpose = document.getElementById("selectedCreditPurpose");
+      const selectedCreditAmount = document.getElementById("selectedCreditAmount");
+      const selectedCreditTotal = document.getElementById("selectedCreditTotal");
+      const selectedCreditRepayment = document.getElementById("selectedCreditRepayment");
+      const selectedCreditUser = document.getElementById("selectedCreditUser");
+      const selectedCreditReason = document.getElementById("selectedCreditReason");
+      const voteText = document.getElementById("voteText");
       
-      // Modal schließen und neu laden
-      hideVotingModal();
-      await loadCredits();
-      return;
-    }
+      if (selectedCreditPurpose) selectedCreditPurpose.textContent = credit.purpose;
+      if (selectedCreditAmount) selectedCreditAmount.textContent = credit.credit_amount.toLocaleString();
+      if (selectedCreditTotal) selectedCreditTotal.textContent = credit.total_price.toLocaleString();
+      if (selectedCreditRepayment) selectedCreditRepayment.textContent = credit.repayment;
+      if (selectedCreditUser) selectedCreditUser.textContent = profile ? profile.mc_name : "Unbekannt";
+      
+      // Begründung anzeigen falls vorhanden
+      if (selectedCreditReason) {
+        if (credit.reason) {
+          selectedCreditReason.textContent = credit.reason;
+          selectedCreditReason.style.display = "block";
+        } else {
+          selectedCreditReason.style.display = "none";
+        }
+      }
 
-    // Prüfen, ob Benutzer bereits abgestimmt hat
-    const hasVoted = creditVotes.some(v => v.user_id === CURRENT_USER_ID);
-    if (hasVoted) {
-      document.getElementById("voteYesBtn").disabled = true;
-      document.getElementById("voteNoBtn").disabled = true;
-      document.getElementById("voteYesBtn").textContent = "👍 Bereits abgestimmt";
-      document.getElementById("voteNoBtn").textContent = "👎 Bereits abgestimmt";
-    } else {
-      document.getElementById("voteYesBtn").disabled = false;
-      document.getElementById("voteNoBtn").disabled = false;
-      document.getElementById("voteYesBtn").textContent = "👍 Ja, dafür";
-      document.getElementById("voteNoBtn").textContent = "👎 Nein, dagegen";
-    }
+      // Einfache Stimmenanzeige statt Progressbar
+      const remainingVotes = TOTAL_MEMBERS - totalVotes;
+      const voteStatusText = totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0 
+        ? yes + " 👍 | " + no + " 👎 - Alle " + TOTAL_MEMBERS + " haben abgestimmt"
+        : yes + " 👍 | " + no + " 👎 (" + totalVotes + "/" + TOTAL_MEMBERS + " abgestimmt, " + remainingVotes + " fehlen)";
+      
+      if (voteText) voteText.textContent = voteStatusText;
 
-    // Event Listener für Buttons setzen
-    document.getElementById("voteYesBtn").onclick = () => vote(creditId, 'yes');
-    document.getElementById("voteNoBtn").onclick = () => vote(creditId, 'no');
+      // Automatische Auswertung wenn alle abgestimmt haben
+      if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
+        // Automatisch nach Mehrheit entscheiden
+        const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
+        await window.supabaseClient
+          .from("credit_requests_new")
+          .update({ status: newStatus })
+          .eq("id", creditId);
+        
+        // Modal schließen und neu laden
+        hideVotingModal();
+        await loadCredits();
+        return;
+      }
+
+      // Prüfen, ob Benutzer bereits abgestimmt hat
+      const hasVoted = creditVotes.some(v => v.user_id === CURRENT_USER_ID);
+      const voteYesBtn = document.getElementById("voteYesBtn");
+      const voteNoBtn = document.getElementById("voteNoBtn");
+      
+      if (voteYesBtn && voteNoBtn) {
+        if (hasVoted) {
+          voteYesBtn.disabled = true;
+          voteNoBtn.disabled = true;
+          voteYesBtn.textContent = "👍 Bereits abgestimmt";
+          voteNoBtn.textContent = "👎 Bereits abgestimmt";
+        } else {
+          voteYesBtn.disabled = false;
+          voteNoBtn.disabled = false;
+          voteYesBtn.textContent = "👍 Ja, dafür";
+          voteNoBtn.textContent = "👎 Nein, dagegen";
+        }
+
+        // Event Listener für Buttons setzen
+        voteYesBtn.onclick = function() { vote(creditId, 'yes'); };
+        voteNoBtn.onclick = function() { vote(creditId, 'no'); };
+      }
+    }
   } catch (error) {
     console.error("Fehler in selectCredit:", error);
     alert("Fehler beim Laden des Kreditantrags: " + error.message);
   }
 }
 
-// Modal-Funktionen
-function hideVotingModal() {
-  const votingModal = document.getElementById("votingModal");
-  if (votingModal) {
-    votingModal.style.display = "none";
-  }
-  SELECTED_CREDIT_ID = null;
-}
-
 // =========================
 // ABSTIMMEN
 // =========================
 async function vote(creditId, voteType) {
-  // Prüfen, ob Benutzer bereits abgestimmt hat
-  const { data: existingVote } = await window.supabaseClient
-    .from("credit_votes")
-    .select("id")
-    .eq("request_id", creditId)
-    .eq("user_id", CURRENT_USER_ID)
-    .single();
+  try {
+    // Prüfen, ob Benutzer bereits abgestimmt hat - NEUE TABELLE
+    const { data: existingVote } = await window.supabaseClient
+      .from("credit_votes_new")
+      .select("id")
+      .eq("request_id", creditId)
+      .eq("user_id", CURRENT_USER_ID)
+      .single();
 
-  if (existingVote) {
-    alert("Du hast bereits abgestimmt!");
-    return;
-  }
+    if (existingVote) {
+      alert("Du hast bereits abgestimmt!");
+      return;
+    }
 
-  // Stimme speichern
-  await window.supabaseClient
-    .from("credit_votes")
-    .insert([{
-      request_id: creditId,
-      user_id: CURRENT_USER_ID,
-      vote: voteType
-    }]);
+    // Stimme speichern - NEUE TABELLE
+    await window.supabaseClient
+      .from("credit_votes_new")
+      .insert([{
+        request_id: creditId,
+        user_id: CURRENT_USER_ID,
+        vote: voteType
+      }]);
 
-  // Prüfen ob alle abgestimmt haben und automatisch auswerten
-  const { data: updatedCredit } = await window.supabaseClient
-    .from("credit_requests")
-    .select(`
-      id,
-      status,
-      credit_votes ( vote )
-    `)
-    .eq("id", creditId)
-    .single();
-  
-  if (updatedCredit && updatedCredit.status === "open") {
-    const yes = updatedCredit.credit_votes.filter(v => v.vote === "yes").length;
-    const no = updatedCredit.credit_votes.filter(v => v.vote === "no").length;
-    const totalVotes = yes + no;
+    // Prüfen ob alle abgestimmt haben und automatisch auswerten - NEUE TABELLEN
+    const { data: updatedCredit } = await window.supabaseClient
+      .from("credit_requests_new")
+      .select(`
+        id,
+        status,
+        credit_votes ( vote )
+      `)
+      .eq("id", creditId)
+      .single();
     
-    // Wenn alle abgestimmt haben, automatisch nach Mehrheit entscheiden
-    if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
-      const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
-      await window.supabaseClient
-        .from("credit_requests")
-        .update({ status: newStatus })
-        .eq("id", creditId);
+    if (updatedCredit && updatedCredit.status === "open") {
+      const yes = updatedCredit.credit_votes.filter(v => v.vote === "yes").length;
+      const no = updatedCredit.credit_votes.filter(v => v.vote === "no").length;
+      const totalVotes = yes + no;
+      
+      // Wenn alle abgestimmt haben, automatisch nach Mehrheit entscheiden
+      if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
+        const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
+        await window.supabaseClient
+          .from("credit_requests_new")
+          .update({ status: newStatus })
+          .eq("id", creditId);
+      }
     }
-  }
-  
-  // UI aktualisieren
-  await loadCredits();
-  
-  // Wenn Modal noch offen ist, aktualisiere es
-  if (SELECTED_CREDIT_ID === creditId) {
-    const votingModal = document.getElementById("votingModal");
-    if (votingModal.style.display === "flex") {
-      await selectCredit(creditId);
+    
+    // UI aktualisieren
+    await loadCredits();
+    
+    // Wenn Modal noch offen ist, aktualisiere es
+    if (SELECTED_CREDIT_ID === creditId) {
+      const votingModal = document.getElementById("votingModal");
+      if (votingModal && votingModal.style.display === "flex") {
+        await selectCredit(creditId);
+      }
     }
+  } catch (error) {
+    console.error("Fehler beim Abstimmen:", error);
+    alert("Fehler beim Abstimmen: " + error.message);
   }
 }
 
@@ -371,72 +425,80 @@ async function vote(creditId, voteType) {
 // STATISTIKEN BERECHNEN
 // =========================
 async function calculateStats(requests) {
-  const openCount = requests.filter(r => r.status === "open").length;
-  const acceptedCount = requests.filter(r => r.status === "accepted").length;
-  const rejectedCount = requests.filter(r => r.status === "rejected").length;
-  
-  const totalRequested = requests.reduce((sum, r) => sum + r.credit_amount, 0);
-  const avgCredit = requests.length > 0 ? Math.round(totalRequested / requests.length) : 0;
-
-  // Update Statistiken
-  document.getElementById("openCount").textContent = openCount;
-  document.getElementById("acceptedCount").textContent = acceptedCount;
-  document.getElementById("rejectedCount").textContent = rejectedCount;
-  document.getElementById("totalRequested").textContent = totalRequested.toLocaleString() + " $";
-
-  // Meine Anträge anzeigen
-  const myRequests = requests.filter(r => r.user_id === CURRENT_USER_ID);
-  const myList = document.getElementById("myCreditsList");
-  
-  if (myList) {
-    myList.innerHTML = "";
+  try {
+    const openCount = requests.filter(r => r.status === "open").length;
+    const acceptedCount = requests.filter(r => r.status === "accepted").length;
+    const rejectedCount = requests.filter(r => r.status === "rejected").length;
     
-    if (myRequests.length === 0) {
-      myList.innerHTML = `<div class="no-requests">Noch keine eigenen Anträge</div>`;
-    } else {
-      myRequests.slice(0, 5).forEach(r => {
-        // Status auf Deutsch übersetzen - einheitliche Schreibweise
-        let statusText = "";
-        let statusIcon = "";
-        let statusClass = "";
-        
-        switch(r.status) {
-          case "open": 
-            statusText = "OFFEN"; 
-            statusIcon = "🕓";
-            statusClass = "open";
-            break;
-          case "accepted": 
-            statusText = "ANGENOMMEN"; 
-            statusIcon = "✅";
-            statusClass = "accepted";
-            break;
-          case "rejected": 
-            statusText = "ABGELEHNT"; 
-            statusIcon = "❌";
-            statusClass = "rejected";
-            break;
-        }
-        
-        myList.innerHTML += `
-          <div class="my-request ${statusClass}">
-            <div class="my-request-title">${r.purpose}</div>
-            <div class="my-request-amount">${r.credit_amount.toLocaleString()} $</div>
-            <div class="my-request-status">${statusIcon} ${statusText}</div>
-          </div>
-        `;
-      });
+    const totalRequested = requests.reduce(function(sum, r) { return sum + r.credit_amount; }, 0);
+    const avgCredit = requests.length > 0 ? Math.round(totalRequested / requests.length) : 0;
+
+    // Update Statistiken
+    const openCountEl = document.getElementById("openCount");
+    const acceptedCountEl = document.getElementById("acceptedCount");
+    const rejectedCountEl = document.getElementById("rejectedCount");
+    const totalRequestedEl = document.getElementById("totalRequested");
+    
+    if (openCountEl) openCountEl.textContent = openCount;
+    if (acceptedCountEl) acceptedCountEl.textContent = acceptedCount;
+    if (rejectedCountEl) rejectedCountEl.textContent = rejectedCount;
+    if (totalRequestedEl) totalRequestedEl.textContent = totalRequested.toLocaleString() + " $";
+
+    // Meine Anträge anzeigen
+    const myRequests = requests.filter(function(r) { return r.user_id === CURRENT_USER_ID; });
+    const myList = document.getElementById("myCreditsList");
+    
+    if (myList) {
+      myList.innerHTML = "";
+      
+      if (myRequests.length === 0) {
+        myList.innerHTML = '<div class="no-requests">Noch keine eigenen Anträge</div>';
+      } else {
+        myRequests.slice(0, 5).forEach(function(r) {
+          // Status auf Deutsch übersetzen
+          let statusText = "";
+          let statusIcon = "";
+          let statusClass = "";
+          
+          switch(r.status) {
+            case "open": 
+              statusText = "OFFEN"; 
+              statusIcon = "🕓";
+              statusClass = "open";
+              break;
+            case "accepted": 
+              statusText = "ANGENOMMEN"; 
+              statusIcon = "✅";
+              statusClass = "accepted";
+              break;
+            case "rejected": 
+              statusText = "ABGELEHNT"; 
+              statusIcon = "❌";
+              statusClass = "rejected";
+              break;
+          }
+          
+          myList.innerHTML += 
+            '<div class="my-request ' + statusClass + '">' +
+              '<div class="my-request-title">' + r.purpose + '</div>' +
+              '<div class="my-request-amount">' + r.credit_amount.toLocaleString() + ' $</div>' +
+              '<div class="my-request-status">' + statusIcon + ' ' + statusText + '</div>' +
+            '</div>';
+        });
+      }
     }
+  } catch (error) {
+    console.error("Fehler beim Berechnen der Statistiken:", error);
   }
 }
 
 // =========================
 // FORMULAR FÜR NEUEN ANTRAG
 // =========================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function() {
   const creditForm = document.getElementById("creditForm");
   if (creditForm) {
-    creditForm.addEventListener("submit", async e => {
+    creditForm.addEventListener("submit", async function(e) {
       e.preventDefault();
 
       const purpose = document.getElementById("creditPurpose").value;
@@ -455,23 +517,32 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      await window.supabaseClient.from("credit_requests").insert([{
-        user_id: CURRENT_USER_ID,
-        purpose: purpose,
-        total_price: total,
-        credit_amount: amount,
-        repayment: repayment,
-        reason: reason,
-        status: "open"
-      }]);
+      try {
+        // NEUE TABELLE verwenden
+        await window.supabaseClient.from("credit_requests_new").insert([{
+          user_id: CURRENT_USER_ID,
+          purpose: purpose,
+          total_price: total,
+          credit_amount: amount,
+          repayment: repayment,
+          reason: reason,
+          status: "open"
+        }]);
 
-      creditForm.reset();
-      document.getElementById("creditUser").value = CURRENT_MC_NAME;
-      
-      // Nach 1 Sekunde neu laden
-      setTimeout(() => {
-        loadCredits();
-      }, 1000);
+        creditForm.reset();
+        const creditUser = document.getElementById("creditUser");
+        if (creditUser) {
+          creditUser.value = CURRENT_MC_NAME;
+        }
+        
+        // Nach 1 Sekunde neu laden
+        setTimeout(function() {
+          loadCredits();
+        }, 1000);
+      } catch (error) {
+        console.error("Fehler beim Erstellen des Kreditantrags:", error);
+        alert("Fehler beim Erstellen des Kreditantrags: " + error.message);
+      }
     });
   }
 });
@@ -490,7 +561,7 @@ function hideVotingModal() {
 // =========================
 // INITIALISIERUNG
 // =========================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", function() {
   // Modal Event Listeners
   const closeVotingModal = document.getElementById("closeVotingModal");
   const votingModal = document.getElementById("votingModal");
@@ -500,7 +571,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   if (votingModal) {
-    votingModal.addEventListener("click", (e) => {
+    votingModal.addEventListener("click", function(e) {
       if (e.target === votingModal) {
         hideVotingModal();
       }
@@ -508,33 +579,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   
   // ESC-Taste zum Schließen
-  document.addEventListener("keydown", (e) => {
+  document.addEventListener("keydown", function(e) {
     if (e.key === "Escape") {
       hideVotingModal();
     }
   });
-});
-
-document.addEventListener("DOMContentLoaded", async () => {
-  await loadProfile();
-  await loadTotalMembers(); // Mitgliederanzahl laden
-  await loadCredits();
   
-  // Real-time Voting-Updates sind nicht mehr nötig - Voting ist jetzt vollständig automatisiert
-  
-  // Real-time Item-Benachrichtigungen einrichten
-  if (window.setupRealtimeNotifications) {
-    setTimeout(() => {
-      window.setupRealtimeNotifications();
-    }, 500);
+  // Logout-Button Event Listener
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", logout);
   }
   
-  // Login-Benachrichtigungen werden automatisch über notifications.js verwaltet
+  // Initialisierung
+  loadProfile();
+  loadTotalMembers();
+  loadCredits();
 });
-
-// =========================
-// ADMIN-FUNKTIONEN
-// =========================
-// IS_ADMIN wird bereits oben deklariert
-
-// Admin-Funktionen wurden entfernt - Voting ist jetzt vollständig automatisiert
