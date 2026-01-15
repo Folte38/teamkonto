@@ -58,54 +58,82 @@ async function loadCredits() {
   const list = document.getElementById("creditList");
   if (!list) return;
 
-  const { data: requests } = await window.supabaseClient
-    .from("credit_requests")
-    .select(`
-      id,
-      purpose,
-      total_price,
-      credit_amount,
-      repayment,
-      reason,
-      status,
-      user_id,
-      profiles ( mc_name ),
-      credit_votes ( vote )
-    `)
-    .order("created_at", { ascending: false });
+  try {
+    // Einfache Abfrage ohne komplexe JOINs
+    const { data: requests } = await window.supabaseClient
+      .from("credit_requests")
+      .select(`
+        id,
+        purpose,
+        total_price,
+        credit_amount,
+        repayment,
+        reason,
+        status,
+        user_id,
+        created_at
+      `)
+      .order("created_at", { ascending: false });
 
-  if (!requests) return;
+    if (!requests) {
+      console.log("Keine Kreditanträge gefunden");
+      list.innerHTML = '<div class="no-requests">Keine Kreditanträge gefunden</div>';
+      await calculateStats([]);
+      return;
+    }
 
-  // Automatische Auswertung für alle offenen Anträge prüfen
-  for (const request of requests) {
-    if (request.status === "open") {
-      const yes = request.credit_votes.filter(v => v.vote === "yes").length;
-      const no = request.credit_votes.filter(v => v.vote === "no").length;
-      const totalVotes = yes + no;
+    // Profile separat laden für Namen
+    const { data: profiles } = await window.supabaseClient
+      .from("profiles")
+      .select("id, mc_name");
+
+    // Votes separat laden
+    const { data: votes } = await window.supabaseClient
+      .from("credit_votes")
+      .select("request_id, user_id, vote");
+
+    // Daten zusammenfügen
+    const requestsWithDetails = requests.map(request => {
+      const profile = profiles.find(p => p.id === request.user_id);
+      const requestVotes = votes.filter(v => v.request_id === request.id);
       
-      // Wenn alle abgestimmt haben, automatisch nach Mehrheit entscheiden
-      if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
-        const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
-        await window.supabaseClient
-          .from("credit_requests")
-          .update({ status: newStatus })
-          .eq("id", request.id);
+      return {
+        ...request,
+        mc_name: profile?.mc_name || "Unbekannt",
+        credit_votes: requestVotes
+      };
+    });
+
+    // Automatische Auswertung für alle offenen Anträge prüfen
+    for (const request of requestsWithDetails) {
+      if (request.status === "open") {
+        const yes = request.credit_votes.filter(v => v.vote === "yes").length;
+        const no = request.credit_votes.filter(v => v.vote === "no").length;
+        const totalVotes = yes + no;
         
-        // Status im lokalen Array aktualisieren
-        request.status = newStatus;
+        // Wenn alle abgestimmt haben, automatisch nach Mehrheit entscheiden
+        if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
+          const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
+          await window.supabaseClient
+            .from("credit_requests")
+            .update({ status: newStatus })
+            .eq("id", request.id);
+          
+          // Status im lokalen Array aktualisieren
+          request.status = newStatus;
+        }
       }
     }
-  }
 
-  // Statistiken berechnen
-  await calculateStats(requests);
+    // Statistiken berechnen
+    await calculateStats(requestsWithDetails);
 
-  list.innerHTML = "";
+    list.innerHTML = "";
 
-  // Offene Anträge zuerst anzeigen
-  const openRequests = requests.filter(r => r.status === "open");
-  const otherRequests = requests.filter(r => r.status !== "open");
-  const allRequests = [...openRequests, ...otherRequests];
+    // Offene Anträge zuerst anzeigen
+    const openRequests = requestsWithDetails.filter(r => r.status === "open");
+    const otherRequests = requestsWithDetails.filter(r => r.status !== "open");
+    const allRequests = [...openRequests, ...otherRequests];
 
 allRequests.forEach(r => {
   const yes = r.credit_votes.filter(v => v.vote === "yes").length;
@@ -146,124 +174,132 @@ allRequests.forEach(r => {
       </div>
 
       <div class="credit-meta">
-        <div><strong>👤 Antragsteller:</strong> ${r.profiles.mc_name}</div>
+        <div><strong>👤 Antragsteller:</strong> ${r.mc_name}</div>
         <div><strong>💰 Gesamtpreis:</strong> ${r.total_price.toLocaleString()} $</div>
-        <div><strong>💳 Kreditbetrag:</strong> ${r.credit_amount.toLocaleString()} $</div>
-        <div><strong>📆 Rückzahlung:</strong> ${r.repayment}</div>
-      </div>
-
-      ${votingStatus}
-
-      ${r.reason ? `<p class="credit-reason"><strong>📝 Begründung:</strong> ${r.reason}</p>` : ""}
-    </div>
-  `;
-});
-}
-
-// =========================
-// KREDIT AUSWÄHLEN FÜR ABSTIMMUNG
 // =========================
 async function selectCredit(creditId) {
   SELECTED_CREDIT_ID = creditId;
   
-  const { data: credit } = await window.supabaseClient
-    .from("credit_requests")
-    .select(`
-      id,
-      purpose,
-      credit_amount,
-      total_price,
-      repayment,
-      reason,
-      status,
-      profiles ( mc_name ),
-      credit_votes ( vote, user_id )
-    `)
-    .eq("id", creditId)
-    .single();
-
-  if (!credit) return;
-
-  // Nur offene Anträge können ausgewählt werden
-  if (credit.status !== "open") {
-    return;
-  }
-
-  // Aktuelle Stimmen zählen
-  const yes = credit.credit_votes.filter(v => v.vote === "yes").length;
-  const no = credit.credit_votes.filter(v => v.vote === "no").length;
-  const totalVotes = yes + no;
-  
-  // Prozent basierend auf Gesamtmitglieder
-  const yesPercent = TOTAL_MEMBERS > 0 ? Math.round((yes / TOTAL_MEMBERS) * 100) : 0;
-  const noPercent = TOTAL_MEMBERS > 0 ? Math.round((no / TOTAL_MEMBERS) * 100) : 0;
-
-  // Modal anzeigen
-  const votingModal = document.getElementById("votingModal");
-  votingModal.style.display = "flex";
-
-  // Daten einfügen
-  document.getElementById("selectedCreditPurpose").textContent = credit.purpose;
-  document.getElementById("selectedCreditAmount").textContent = credit.credit_amount.toLocaleString();
-  document.getElementById("selectedCreditTotal").textContent = credit.total_price.toLocaleString();
-  document.getElementById("selectedCreditRepayment").textContent = credit.repayment;
-  document.getElementById("selectedCreditUser").textContent = credit.profiles.mc_name;
-  
-  // Begründung anzeigen falls vorhanden
-  const reasonEl = document.getElementById("selectedCreditReason");
-  if (credit.reason) {
-    reasonEl.textContent = credit.reason;
-    reasonEl.style.display = "block";
-  } else {
-    reasonEl.style.display = "none";
-  }
-
-  // Einfache Stimmenanzeige statt Progressbar
-  const remainingVotes = TOTAL_MEMBERS - totalVotes;
-  const voteStatusText = totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0 
-    ? `${yes} 👍 | ${no} 👎 - Alle ${TOTAL_MEMBERS} haben abgestimmt`
-    : `${yes} 👍 | ${no} 👎 (${totalVotes}/${TOTAL_MEMBERS} abgestimmt, ${remainingVotes} fehlen)`;
-  
-  document.getElementById("voteText").textContent = voteStatusText;
-
-  // Automatische Auswertung wenn alle abgestimmt haben
-  if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
-    // Automatisch nach Mehrheit entscheiden
-    const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
-    await window.supabaseClient
+  try {
+    // Einfache Abfrage ohne komplexe JOINs
+    const { data: credit } = await window.supabaseClient
       .from("credit_requests")
-      .update({ status: newStatus })
-      .eq("id", creditId);
+      .select(`
+        id,
+        purpose,
+        credit_amount,
+        total_price,
+        repayment,
+        reason,
+        status,
+        user_id,
+        created_at
+      `)
+      .eq("id", creditId)
+      .single();
+
+    if (!credit) return;
+
+    // Nur offene Anträge können ausgewählt werden
+    if (credit.status !== "open") {
+      return;
+    }
+
+    // Profile und Votes separat laden
+    const { data: profiles } = await window.supabaseClient
+      .from("profiles")
+      .select("id, mc_name");
+
+    const { data: votes } = await window.supabaseClient
+      .from("credit_votes")
+      .select("request_id, user_id, vote")
+      .eq("request_id", creditId);
+
+    // Daten zusammenfügen
+    const profile = profiles.find(p => p.id === credit.user_id);
+    const creditVotes = votes || [];
+
+    // Aktuelle Stimmen zählen
+    const yes = creditVotes.filter(v => v.vote === "yes").length;
+    const no = creditVotes.filter(v => v.vote === "no").length;
+    const totalVotes = yes + no;
     
-    // Modal schließen und neu laden
-    hideVotingModal();
-    await loadCredits();
-    return;
-  }
+    // Prozent basierend auf Gesamtmitglieder
+    const yesPercent = TOTAL_MEMBERS > 0 ? Math.round((yes / TOTAL_MEMBERS) * 100) : 0;
+    const noPercent = TOTAL_MEMBERS > 0 ? Math.round((no / TOTAL_MEMBERS) * 100) : 0;
 
-  // Prüfen, ob Benutzer bereits abgestimmt hat
-  const hasVoted = credit.credit_votes.some(v => v.user_id === CURRENT_USER_ID);
-  if (hasVoted) {
-    document.getElementById("voteYesBtn").disabled = true;
-    document.getElementById("voteNoBtn").disabled = true;
-    document.getElementById("voteYesBtn").textContent = "👍 Bereits abgestimmt";
-    document.getElementById("voteNoBtn").textContent = "👎 Bereits abgestimmt";
-  } else {
-    document.getElementById("voteYesBtn").disabled = false;
-    document.getElementById("voteNoBtn").disabled = false;
-    document.getElementById("voteYesBtn").textContent = "👍 Ja, dafür";
-    document.getElementById("voteNoBtn").textContent = "👎 Nein, dagegen";
-  }
+    // Modal anzeigen
+    const votingModal = document.getElementById("votingModal");
+    votingModal.style.display = "flex";
 
-  // Event Listener für Buttons setzen
-  document.getElementById("voteYesBtn").onclick = () => vote(creditId, 'yes');
-  document.getElementById("voteNoBtn").onclick = () => vote(creditId, 'no');
+    // Daten einfügen
+    document.getElementById("selectedCreditPurpose").textContent = credit.purpose;
+    document.getElementById("selectedCreditAmount").textContent = credit.credit_amount.toLocaleString();
+    document.getElementById("selectedCreditTotal").textContent = credit.total_price.toLocaleString();
+    document.getElementById("selectedCreditRepayment").textContent = credit.repayment;
+    document.getElementById("selectedCreditUser").textContent = profile?.mc_name || "Unbekannt";
+    
+    // Begründung anzeigen falls vorhanden
+    const reasonEl = document.getElementById("selectedCreditReason");
+    if (credit.reason) {
+      reasonEl.textContent = credit.reason;
+      reasonEl.style.display = "block";
+    } else {
+      reasonEl.style.display = "none";
+    }
+
+    // Einfache Stimmenanzeige statt Progressbar
+    const remainingVotes = TOTAL_MEMBERS - totalVotes;
+    const voteStatusText = totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0 
+      ? `${yes} 👍 | ${no} 👎 - Alle ${TOTAL_MEMBERS} haben abgestimmt`
+      : `${yes} 👍 | ${no} 👎 (${totalVotes}/${TOTAL_MEMBERS} abgestimmt, ${remainingVotes} fehlen)`;
+    
+    document.getElementById("voteText").textContent = voteStatusText;
+
+    // Automatische Auswertung wenn alle abgestimmt haben
+    if (totalVotes === TOTAL_MEMBERS && TOTAL_MEMBERS > 0) {
+      // Automatisch nach Mehrheit entscheiden
+      const newStatus = yes > no ? "accepted" : yes < no ? "rejected" : "rejected";
+      await window.supabaseClient
+        .from("credit_requests")
+        .update({ status: newStatus })
+        .eq("id", creditId);
+      
+      // Modal schließen und neu laden
+      hideVotingModal();
+      await loadCredits();
+      return;
+    }
+
+    // Prüfen, ob Benutzer bereits abgestimmt hat
+    const hasVoted = creditVotes.some(v => v.user_id === CURRENT_USER_ID);
+    if (hasVoted) {
+      document.getElementById("voteYesBtn").disabled = true;
+      document.getElementById("voteNoBtn").disabled = true;
+      document.getElementById("voteYesBtn").textContent = "👍 Bereits abgestimmt";
+      document.getElementById("voteNoBtn").textContent = "👎 Bereits abgestimmt";
+    } else {
+      document.getElementById("voteYesBtn").disabled = false;
+      document.getElementById("voteNoBtn").disabled = false;
+      document.getElementById("voteYesBtn").textContent = "👍 Ja, dafür";
+      document.getElementById("voteNoBtn").textContent = "👎 Nein, dagegen";
+    }
+
+    // Event Listener für Buttons setzen
+    document.getElementById("voteYesBtn").onclick = () => vote(creditId, 'yes');
+    document.getElementById("voteNoBtn").onclick = () => vote(creditId, 'no');
+  } catch (error) {
+    console.error("Fehler in selectCredit:", error);
+    alert("Fehler beim Laden des Kreditantrags: " + error.message);
+  }
 }
 
 // Modal-Funktionen
 function hideVotingModal() {
   const votingModal = document.getElementById("votingModal");
-  votingModal.style.display = "none";
+  if (votingModal) {
+    votingModal.style.display = "none";
+  }
   SELECTED_CREDIT_ID = null;
 }
 
@@ -484,8 +520,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadTotalMembers(); // Mitgliederanzahl laden
   await loadCredits();
   
-  // Real-time Voting-Updates einrichten
-  setupRealtimeVotingUpdates();
+  // Real-time Voting-Updates sind nicht mehr nötig - Voting ist jetzt vollständig automatisiert
   
   // Real-time Item-Benachrichtigungen einrichten
   if (window.setupRealtimeNotifications) {
