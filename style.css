@@ -437,70 +437,319 @@ body {
    LOGIN – ISOLIERT
 ========================= */
 
-.login-body {
-  margin: 0;
-  height: 100vh;
+/* =========================
+   MODERN LOGIN DESIGN
+========================= */
+
+/* Login-Overlay Background */
+.login-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("background.png") center / cover no-repeat;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: url("background.png") center / cover no-repeat;
+  z-index: 1000;
+  padding: 20px;
 }
 
-.login-overlay {
-  width: 340px;
-  background: rgba(15,15,15,.9);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  padding: 30px 28px;
+/* Modern Login Container */
+.login-overlay-content {
+  background: linear-gradient(135deg, rgba(15, 15, 15, 0.95) 0%, rgba(25, 25, 35, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 48px 40px;
   text-align: center;
-  box-shadow: 0 20px 60px rgba(0,0,0,.6);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  max-width: 420px;
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+  animation: slideUp 0.5s ease-out;
 }
 
+/* Modern Logo */
 .login-logo {
-  width: 220px;
-  margin-bottom: 18px;
+  width: 200px;
+  margin-bottom: 32px;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+  transition: transform 0.3s ease;
 }
 
-.login-overlay h2 {
-  margin-bottom: 20px;
-  font-weight: 600;
+.login-logo-secondary {
+  width: 120px;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  opacity: 0.3;
+  filter: blur(1px);
+  transition: opacity 0.3s ease;
 }
 
-.login-overlay input {
-  width: 100%;
-  padding: 11px 14px;
-  margin-bottom: 12px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(0,0,0,.4);
+.login-logo:hover {
+  transform: scale(1.05);
+}
+
+.login-logo-secondary:hover {
+  opacity: 0.6;
+}
+
+/* Modern Title */
+.login-overlay-content h2 {
+  margin: 0 0 32px 0;
+  font-size: 28px;
+  font-weight: 700;
   color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  letter-spacing: -0.5px;
+}
+
+/* Modern Description */
+.login-overlay-content p {
+  margin: 0 0 32px 0;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Status Info Box */
+.login-status-info {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  margin: 0 0 32px 0;
+  backdrop-filter: blur(5px);
+}
+
+.login-status-info p {
+  margin: 0 0 12px 0;
   font-size: 14px;
+  color: rgba(255, 255, 255, 0.9);
+  line-height: 1.5;
 }
 
-.login-overlay input::placeholder {
-  color: rgba(255,255,255,.4);
+.login-status-info p:last-child {
+  margin-bottom: 0;
 }
 
-.login-overlay button {
-  width: 100%;
-  padding: 12px;
-  border-radius: 12px;
-  border: none;
-  background: #4caf50;
-  color: #fff;
-  font-size: 15px;
+.login-note {
   font-weight: 600;
-  cursor: pointer;
+  color: #4caf50;
+  text-shadow: 0 1px 2px rgba(76, 175, 80, 0.3);
 }
 
-.login-overlay button:hover {
-  background: #43a047;
+/* Modern Input Fields */
+.login-input {
+  width: 100%;
+  padding: 16px 20px;
+  margin: 12px 0;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.login-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 400;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: #4caf50;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 0 0 4px rgba(76, 175, 80, 0.1),
+    0 8px 24px rgba(76, 175, 80, 0.15);
+  transform: translateY(-2px);
+}
+
+.login-input:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Modern Login Button */
+.login-btn {
+  width: 100%;
+  padding: 18px 32px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.login-btn:hover {
+  background: linear-gradient(135deg, #45a049 0%, #43a047 100%);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(76, 175, 80, 0.4);
+}
+
+.login-btn:hover::before {
+  left: 100%;
+}
+
+.login-btn:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+/* Modern Error Message */
+.login-error-container {
+  margin-top: 16px;
+  min-height: 20px;
 }
 
 .login-error {
-  margin-top: 12px;
-  font-size: 13px;
-  color: #ff6b6b;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: #fff;
+  background: linear-gradient(135deg, #ff6b6b 0%, #ff5252 100%);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Animations */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .login-overlay {
+    padding: 16px;
+  }
+  
+  .login-overlay-content {
+    padding: 32px 24px;
+    margin: 16px;
+    max-width: none;
+  }
+  
+  .login-logo {
+    width: 160px;
+    margin-bottom: 24px;
+  }
+  
+  .login-logo-secondary {
+    width: 80px;
+    top: 15px;
+    right: 15px;
+  }
+  
+  .login-overlay-content h2 {
+    font-size: 24px;
+    margin-bottom: 24px;
+  }
+  
+  .login-overlay-content p {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  
+  .login-status-info {
+    padding: 16px;
+    margin: 0 0 24px 0;
+  }
+  
+  .login-status-info p {
+    font-size: 13px;
+    margin: 0 0 8px 0;
+  }
+  
+  .login-error-container {
+    margin-top: 12px;
+  }
+  
+  .login-input {
+    padding: 14px 16px;
+    font-size: 14px;
+  }
+  
+  .login-btn {
+    padding: 16px 24px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-overlay-content {
+    padding: 24px 20px;
+    border-radius: 20px;
+  }
+  
+  .login-logo {
+    width: 140px;
+  }
+  
+  .login-overlay-content h2 {
+    font-size: 22px;
+  }
+  
+  .login-status-info {
+    padding: 12px;
+    margin: 0 0 20px 0;
+  }
+  
+  .login-status-info p {
+    font-size: 12px;
+    margin: 0 0 6px 0;
+  }
+  
+  .login-input {
+    padding: 12px 16px;
+  }
+  
+  .login-btn {
+    padding: 14px 20px;
+  }
 }
 /* =========================
    ITEMS – ISOLIERT & SICHER
@@ -587,6 +836,16 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 4px;
+}
+
+.items-page .item-available {
+  color: #2e7d32;
+  font-weight: 600;
+  font-size: 11px;
+}
+
+.items-page .team-item:hover .item-available {
+  color: #4caf50;
 }
 /* =========================
    ITEMS – HAUPT-CONTAINER
@@ -1475,6 +1734,10 @@ body {
 }
 
 /* =========================
+   LOGIN-OVERLAY STYLES (GLOBAL) - VERALTET, SIEHE OBEN
+========================= */
+
+/* =========================
    KREDIT-VOTING PROGRESSBAR & BUTTONS (NEU)
 ========================= */
 
@@ -1816,14 +2079,17 @@ body {
 
 .status.status-red {
   color: #f44336; /* Rot - niemand bezahlt */
+  border-left-color: #f44336 !important; /* Linker Rand auch rot */
 }
 
 .status.status-orange {
   color: #ff9800; /* Orange - teilweise bezahlt */
+  border-left-color: #ff9800 !important; /* Linker Rand auch orange */
 }
 
 .status.status-green {
   color: #4caf50; /* Grün - alle bezahlt */
+  border-left-color: #4caf50 !important; /* Linker Rand auch grün */
 }
 
 /* INFO-BOX */
@@ -2433,6 +2699,43 @@ body {
 .player:hover {
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Klickbare Spieler-Boxen für Admins */
+.player.clickable {
+  cursor: pointer;
+  position: relative;
+}
+
+.player.clickable:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  border-color: #fff !important;
+}
+
+.player.clickable:hover::after {
+  content: "🔄 Status ändern";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  animation: fadeInOut 0.3s ease forwards;
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
 /* Status-Farben verbessern */
@@ -3164,7 +3467,7 @@ body {
   background: rgba(0, 0, 0, 0.2);
   padding: 10px 15px;
   border-radius: 10px;
-  border-left: 3px solid #ff9800;
+  border-left: 3px solid #ff9800; /* Standard orange, wird durch Klassen überschrieben */
 }
 
 /* Hervorhebung für Abstimmungsergebnisse */
@@ -3641,6 +3944,8 @@ body {
   justify-content: center;
   border-radius: 50%;
   transition: all 0.2s;
+  position: relative;
+  z-index: 10;
 }
 
 .modal-close:hover {
@@ -4089,7 +4394,8 @@ body {
 ========================= */
 
 /* Overlay für Dialog */
-.delete-modal-overlay {
+.delete-modal-overlay,
+.confirm-overlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -4104,22 +4410,43 @@ body {
   animation: fadeIn 0.3s ease;
 }
 
+/* Spezifische Regel für Confirm-Modal - höchste Priorität */
+div.confirm-modal {
+  background: linear-gradient(145deg, rgba(30, 30, 30, 0.98), rgba(20, 20, 20, 0.98)) !important;
+  border-radius: 20px !important;
+  width: 420px;
+  max-width: 90vw;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  overflow: hidden;
+  animation: slideUp 0.3s ease;
+}
+
+/* Zusätzliche Regel für alle Elemente mit confirm-modal Klasse */
+[class*="confirm-modal"] {
+  background: linear-gradient(145deg, rgba(30, 30, 30, 0.98), rgba(20, 20, 20, 0.98)) !important;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
 /* Moderner Dialog-Container */
-.delete-modal {
-  background: linear-gradient(145deg, rgba(30, 30, 30, 0.98), rgba(20, 20, 20, 0.98));
-  border-radius: 20px;
+.delete-modal,
+.confirm-modal {
+  background: linear-gradient(145deg, rgba(30, 30, 30, 0.98), rgba(20, 20, 20, 0.98)) !important;
+  border-radius: 20px !important;
   width: 420px;
   max-width: 90vw;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 
     0 20px 60px rgba(0, 0, 0, 0.8),
     0 0 0 1px rgba(255, 255, 255, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
   overflow: hidden;
   animation: slideUp 0.3s ease;
 }
@@ -4132,6 +4459,106 @@ body {
   to { 
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+/* Modal Content */
+.delete-modal-content,
+.confirm-modal-content {
+  padding: 32px 28px;
+  text-align: center;
+}
+
+/* Modal Header */
+.delete-modal-content h3,
+.confirm-modal-content h3 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Modal Message */
+.delete-modal-content p,
+.confirm-modal-content p {
+  margin: 0 0 28px 0;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+}
+
+/* Modal Actions */
+.confirm-modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Modal Buttons */
+.confirm-btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 100px;
+}
+
+.cancel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.confirm-btn-primary {
+  background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+  color: white;
+  border: none;
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.confirm-btn-primary:hover {
+  background: linear-gradient(135deg, #45a049 0%, #43a047 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .delete-modal,
+  .confirm-modal {
+    width: 90vw;
+    margin: 16px;
+  }
+  
+  .delete-modal-content,
+  .confirm-modal-content {
+    padding: 24px 20px;
+  }
+  
+  .delete-modal-content h3,
+  .confirm-modal-content h3 {
+    font-size: 18px;
+  }
+  
+  .delete-modal-content p,
+  .confirm-modal-content p {
+    font-size: 14px;
+  }
+  
+  .confirm-btn {
+    padding: 10px 20px;
+    font-size: 13px;
+    min-width: 80px;
   }
 }
 

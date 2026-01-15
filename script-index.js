@@ -1,11 +1,30 @@
 // =========================
-// LOGIN CHECK
+// LOGIN CHECK & SEITEN-WECHSEL
 // =========================
 window.supabaseClient.auth.getSession().then(({ data }) => {
   if (!data.session) {
-    window.location.href = "login.html";
+    // Nicht eingeloggt -> Login-Seite anzeigen
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+  } else {
+    // Eingeloggt -> Hauptinhalt anzeigen
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    initializeApp();
   }
 });
+
+// =========================
+// APP INITIALISIERUNG (wird nur bei eingeloggten Nutzern aufgerufen)
+// =========================
+function initializeApp() {
+  loadProfile();
+  loadWeeks();
+  loadPaymentsFromDB();
+  loadPlayerPaymentStatus();
+  loadArchive();
+  setupEventListeners();
+}
 
 // =========================
 // HILFSFUNKTIONEN
@@ -95,9 +114,9 @@ async function loadTeamGoals() {
 
           <div class="goal-details">
             <small><strong>Ziel:</strong> ${goal.cost.toLocaleString()} $</small><br>
-            <small><strong>Aktuell:</strong> ${Math.round(goal.cost * progress / 100).toLocaleString()} $</small><br>
-            <small><strong>Benötigt:</strong> ${Math.max(0, goal.cost - Math.round(goal.cost * progress / 100)).toLocaleString()} $</small><br>
-            <small><strong>Fortschritt:</strong> ${percent}%</small><br>
+            <small><strong>Aktuell:</strong> ${goal.current_exact ? goal.current_exact.toLocaleString() : Math.round(goal.cost * goal.progress / 100).toLocaleString()} $</small><br>
+            <small><strong>Benötigt:</strong> ${goal.current_exact ? Math.max(0, goal.cost - goal.current_exact).toLocaleString() : Math.max(0, goal.cost - Math.round(goal.cost * goal.progress / 100)).toLocaleString()} $</small><br>
+            <small><strong>Fortschritt:</strong> ${goal.progress}%</small><br>
             <small><strong>Erstellt:</strong> ${new Date(goal.created_at).toLocaleDateString('de-DE')}</small>
           </div>
 
@@ -236,7 +255,7 @@ async function loadPaymentsFromDB() {
 }
 
 // =========================
-// SPIELERSTATUS - SAUBERE VERSION
+// SPIELERSTATUS - VERBESSERTE VERSION MIT DEBUGGING
 // =========================
 async function loadPlayerPaymentStatus() {
   console.log("Lade Spielerstatus für Woche:", SELECTED_WEEK || CURRENT_WEEK);
@@ -249,22 +268,18 @@ async function loadPlayerPaymentStatus() {
 
   // Loading-Status anzeigen
   el.innerHTML = '<div class="loading">Lade Spieler...</div>';
-  
-  const footer = document.querySelector('.footer');
-  if (footer) {
-    footer.textContent = `Team Kasse · Stand diese Woche · Spieler werden geladen...`;
-  }
 
   try {
     // NUR profiles laden - keine payments mehr!
     const { data: profiles, error: profilesError } = await window.supabaseClient
       .from("profiles")
       .select("id, mc_name, payment_status");
-      
+    
     if (profilesError || !profiles) {
       console.error("Fehler beim Laden der Profile:", profilesError);
       el.innerHTML = '<div class="error">Fehler beim Laden der Spieler</div>';
       
+      const footer = document.querySelector('.footer');
       if (footer) {
         footer.textContent = `Team Kasse · Stand diese Woche · Fehler beim Laden`;
       }
@@ -272,69 +287,72 @@ async function loadPlayerPaymentStatus() {
     }
     
     console.log("Profile geladen:", profiles.length);
-
     el.innerHTML = "";
     
     // DEBUG: Alle Profile ausgeben
     console.log("🔍 DEBUG - Alle Profile:", profiles);
     console.log("🔍 DEBUG - Profile Anzahl:", profiles.length);
     
-    // Spieler rendern mit NUR payment_status
+    // Spieler mit payment_status = null als "nicht bezahlt" behandeln
     profiles.forEach((p, index) => {
-      console.log(`🔍 DEBUG - Spieler ${index + 1}:`, p);
-      
-      // Status direkt aus profiles.payment_status lesen
       const status = p.payment_status === 1 ? "paid" : "unpaid";
       const label = p.payment_status === 1 ? "Bezahlt" : "Nicht bezahlt";
       
+      console.log(`🔍 DEBUG - Spieler ${index + 1}:`, p);
       console.log(`🔍 DEBUG - Status für ${p.mc_name}:`, status, label);
       
       el.innerHTML += `
-        <div class="player ${status}" data-player-id="${p.id}" data-player-name="${p.mc_name}">
+        <div class="player ${status} ${IS_ADMIN ? 'clickable' : ''}" data-player-id="${p.id}" data-player-name="${p.mc_name}">
           <img src="https://mc-heads.net/avatar/${p.mc_name}/64" 
                alt="${p.mc_name}"
                onerror="this.src='https://mc-heads.net/avatar/Steve/64'">
           <div class="name">${p.mc_name}</div>
           <small>${label}</small>
-          ${IS_ADMIN ? `
-            ${p.payment_status !== 1 ? `<button class="mark-paid-btn" onclick="markPlayerAsPaid('${p.id}', '${p.mc_name}')" title="Als bezahlt markieren">✓</button>` : `<button class="mark-unpaid-btn" onclick="markPlayerAsUnpaid('${p.id}', '${p.mc_name}')" title="Als nicht bezahlt markieren">✗</button>`}
-          ` : ""}
         </div>
       `;
     });
-
+    
     // Status-Zählung basierend auf payment_status
     const paidCount = profiles.filter(p => p.payment_status === 1).length;
     const totalCount = profiles.length;
+    
+    console.log(`🔍 DEBUG - Status-Zählung: ${paidCount}/${totalCount} bezahlt`);
     
     // Status-Farbe basierend auf Anzahl der bezahlenden Spieler
     let statusClass = "";
     if (paidCount === 0) {
       statusClass = "status-red"; // Niemand bezahlt
+      console.log("🔍 DEBUG - Status: ROT (niemand bezahlt)");
     } else if (paidCount < totalCount) {
       statusClass = "status-orange"; // Teilweise bezahlt
+      console.log("🔍 DEBUG - Status: ORANGE (teilweise bezahlt)");
     } else {
       statusClass = "status-green"; // Alle bezahlt
+      console.log("🔍 DEBUG - Status: GRÜN (alle bezahlt)");
     }
     
     const statusLine = document.getElementById("statusLine");
     if (statusLine) {
-      statusLine.innerText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+      const statusText = `${SELECTED_WEEK} · ${paidCount} / ${totalCount} Spieler bezahlt`;
+      statusLine.innerText = statusText;
       statusLine.className = `status ${statusClass}`;
+      console.log(`🔍 DEBUG - Status-Line gesetzt: "${statusText}" mit Klasse "${statusClass}"`);
     }
     
     // FOOTER AKTUALISIEREN
+    const footer = document.querySelector('.footer');
     if (footer) {
       footer.textContent = `with ♥️ by Folte38 & TobiWanNoobie · Team Kasse · Stand diese Woche · ${profiles.length} Spieler`;
-      console.log(`Footer aktualisiert: ${profiles.length} Spieler`);
+      console.log(`🔍 DEBUG - Footer aktualisiert: ${profiles.length} Spieler`);
     }
     
   } catch (error) {
     console.error("Unerwarteter Fehler:", error);
     el.innerHTML = '<div class="error">Systemfehler beim Laden der Spieler</div>';
     
+    const footer = document.querySelector('.footer');
     if (footer) {
-      footer.textContent = `Team Kasse · Stand diese Woche · Fehler aufgetreten`;
+      footer.textContent = `Team Kasse · Stand diese Woche · Fehler beim Laden`;
     }
   }
 }
@@ -400,12 +418,39 @@ async function markPlayerAsPaid(playerId, playerName) {
       console.log("✅ RPC-Funktion erfolgreich ausgeführt:", data);
     }
     
+    // Archiv-Eintrag für Wochenbeitrag erstellen
+    try {
+      console.log("📝 Erstelle Archiv-Eintrag für Wochenbeitrag...");
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      
+      if (user) {
+        const { error: archiveError } = await window.supabaseClient
+          .from("payments")
+          .insert([{
+            user_id: user.id,
+            type: "beitrag",
+            amount: 2000000, // 2.000.000 $
+            note: playerName, // Nur der Spielername
+            week: SELECTED_WEEK || CURRENT_WEEK
+          }]);
+          
+        if (archiveError) {
+          console.error("❌ Fehler beim Archiv-Eintrag:", archiveError);
+        } else {
+          console.log("✅ Archiv-Eintrag erfolgreich erstellt");
+        }
+      }
+    } catch (archiveError) {
+      console.error("❌ Fehler beim Erstellen des Archiv-Eintrags:", archiveError);
+    }
+    
     // Erfolgsmeldung
     alert(`${playerName} wurde erfolgreich als bezahlt markiert!`);
     
     // SOFORT UI aktualisieren mit Cache-Busting
     console.log("🔄 SOFORT UI aktualisieren...");
     await loadPlayerPaymentStatus();
+    await loadArchive(); // Archiv neu laden
     console.log("✅ UI sofort aktualisiert");
     
     // Zusätzlicher Reload nach 200ms für Sicherheit
@@ -588,6 +633,22 @@ document.addEventListener("DOMContentLoaded", () => {
       hideArchiveModal();
     }
   });
+});
+
+// Spieler-Box Click-Handler für Admins
+document.addEventListener("click", (e) => {
+  const playerBox = e.target.closest(".player.clickable");
+  if (playerBox && IS_ADMIN) {
+    const playerId = playerBox.dataset.playerId;
+    const playerName = playerBox.dataset.playerName;
+    const isPaid = playerBox.classList.contains("paid");
+    
+    if (isPaid) {
+      markPlayerAsUnpaid(playerId, playerName);
+    } else {
+      markPlayerAsPaid(playerId, playerName);
+    }
+  }
 });
 
 // Archiv-Formular absenden
@@ -780,8 +841,18 @@ document.addEventListener("DOMContentLoaded", () => {
       const cost = parseInt(document.getElementById("goalCost").value);
       const current = parseInt(document.getElementById("goalCurrent").value) || 0;
       
-      // Fortschritt aus aktueller Summe berechnen
-      const progress = Math.min(Math.max(Math.round((current / cost) * 100), 1), 100);
+      // Fortschritt aus aktueller Summe berechnen (präzise ohne Rundung)
+      const progress = Math.min(Math.max((current / cost) * 100, 0.01), 100);
+      
+      // Debug-Logs für die Berechnung
+      console.log("🔍 DEBUG - Ziel-Berechnung (exakt):", {
+        current: current,
+        cost: cost,
+        prozentRaw: (current / cost) * 100,
+        prozentPraezise: progress,
+        exakterWert: current, // Der exakte Eingabewert
+        differenz: 0 // Keine Differenz mehr!
+      });
       
       const goalMsg = document.getElementById("goalMsg");
 
@@ -792,14 +863,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       let result;
       if (EDITING_GOAL_ID) {
-        // Bestehendes Ziel aktualisieren
+        // Bestehendes Ziel aktualisieren mit exaktem current_exact Wert
         console.log("Aktualisiere Ziel:", EDITING_GOAL_ID, { name, cost, progress, current });
         result = await window.supabaseClient
           .from("team_goals")
           .update({
             name,
             cost,
-            progress
+            progress,
+            current_exact: current // Exakter Wert!
           })
           .eq("id", EDITING_GOAL_ID);
           
@@ -808,7 +880,7 @@ document.addEventListener("DOMContentLoaded", () => {
           goalMsg.innerText = "✅ Ziel aktualisiert";
         }
       } else {
-        // Neues Ziel erstellen
+        // Neues Ziel erstellen mit exaktem current_exact Wert
         console.log("Erstelle neues Ziel:", { name, cost, progress, current, userId: user.id });
         result = await window.supabaseClient
           .from("team_goals")
@@ -816,6 +888,7 @@ document.addEventListener("DOMContentLoaded", () => {
             name,
             cost,
             progress,
+            current_exact: current, // Exakter Wert!
             created_by: user.id,
             is_active: true
           }]);
@@ -857,19 +930,21 @@ document.addEventListener("DOMContentLoaded", () => {
 // Die Login-Benachrichtigungen werden jetzt über notifications.js verwaltet
 
 // =========================
-// INIT - ORIGINAL VERSION
+// INIT - ANGEPASSTE VERSION
 // =========================
 document.addEventListener("DOMContentLoaded", async () => {
   console.log("🚀 INIT wird ausgeführt...");
   
-  await loadProfile();
-  console.log("✅ loadProfile abgeschlossen");
-  
-  await loadWeeks();
-  console.log("✅ loadWeeks abgeschlossen");
-  
-  loadPaymentsFromDB();
-  console.log("✅ loadPaymentsFromDB abgeschlossen");
+  // Warten auf Login-Check, dann initialisieren
+  setTimeout(() => {
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent && mainContent.style.display !== 'none') {
+      // Nur initialisieren wenn eingeloggt und Hauptinhalt sichtbar
+      loadProfile();
+      loadWeeks();
+      setupEventListeners();
+    }
+  }, 100);
   
   loadPlayerPaymentStatus();
   console.log("✅ loadPlayerPaymentStatus abgeschlossen");

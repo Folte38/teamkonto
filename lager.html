@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Team Lager</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+</head>
+<body>
+
+<!-- LOGIN-SEITE (wird angezeigt wenn nicht eingeloggt) -->
+<div id="loginPage" class="login-overlay" style="display: none;">
+  <div class="login-overlay-content">
+    <img src="logo.png" alt="Logo" class="login-logo">
+    <h2>🔐 Anmeldung erforderlich</h2>
+    <p>Du musst angemeldet sein, um auf das Team Lager zugreifen zu können.</p>
+    <button onclick="window.location.href='login.html'" class="login-btn">
+      Zum Login
+    </button>
+  </div>
+</div>
+
+<!-- HAUPTINHALT (wird angezeigt wenn eingeloggt) -->
+<div id="mainContent" style="display: none;">
+<nav class="nav">
+  <div class="nav-user" id="navUser" style="display:none;">
+    <img id="navAvatar" src="" alt="MC Kopf">
+    <span id="navUsername"></span>
+    <button id="logoutBtn" class="logout-btn" title="Ausloggen">🚪</button>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html">Startseite</a>
+    <a href="items.html">Inventar</a>
+    <a href="lager.html" class="active">Lager</a>
+    <a href="kredite.html">Kredit</a>
+  </div>
+</nav>
+
+<div class="page-box lager-page">
+  <h1 class="page-title">Team Lager 📦</h1>
+
+  <!-- KONTROLLELEMENTE -->
+<div class="items-controls">
+  <div class="search-container">
+    <input type="text" id="lagerSearchInput" placeholder="Item suchen..." class="search-input">
+    <button id="clearLagerSearchBtn" class="clear-search">✕</button>
+  </div>
+  
+  <!-- ACTION-BUTTONS RECHTS -->
+  <div class="action-buttons-row">
+    <button class="add-item-btn" id="addLagerItemBtn" title="Neues Item hinzufügen">
+      ➕ Item hinzufügen
+    </button>
+  </div>
+</div>
+
+  <!-- AKTIVE FILTER ANZEIGE -->
+  <div class="active-filters" id="lagerActiveFilters" style="display: none;">
+    <div class="filter-tags" id="lagerFilterTags"></div>
+    <button class="clear-filters-btn" id="clearLagerFiltersBtn">Filter löschen</button>
+  </div>
+
+  <div id="lagerItems"></div>
+</div>
+
+</div><!-- Ende von mainContent -->
+
+<!-- MODAL FÜR NEUES LAGER-ITEM -->
+<div class="modal-overlay" id="addLagerItemModal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>➕ Neues Item zum Lager hinzufügen</h2>
+      <button class="modal-close" id="closeLagerModalBtn">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="addLagerItemForm">
+        <div class="form-group">
+          <label for="lagerItemName">Item Name:</label>
+          <input type="text" id="lagerItemName" placeholder="z.B. Diamant-Block" required>
+        </div>
+        
+        <div class="form-group">
+          <label>Hinzugefügt von:</label>
+          <div class="owner-info">
+            <img id="currentUserAvatar" src="" alt="MC Kopf" class="current-user-avatar">
+            <span id="currentUserName"></span>
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-submit">Item hinzufügen</button>
+          <button type="button" class="btn-cancel" id="cancelLagerModalBtn">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="notifications.js"></script>
+<script src="logout.js"></script>
+<script src="script-lager.js"></script>
+
+</body>
+</html>

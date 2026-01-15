@@ -9,6 +9,21 @@
 </head>
 <body>
 
+<!-- LOGIN-SEITE (wird angezeigt wenn nicht eingeloggt) -->
+<div id="loginPage" class="login-overlay" style="display: none;">
+  <div class="login-overlay-content">
+    <img src="logo.png" alt="Logo" class="login-logo">
+    <h2>🔐 Anmeldung erforderlich</h2>
+    <p>Du musst angemeldet sein, um auf das Team Inventar zugreifen zu können.</p>
+    <button onclick="window.location.href='login.html'" class="login-btn">
+      Zum Login
+    </button>
+  </div>
+</div>
+
+<!-- HAUPTINHALT (wird angezeigt wenn eingeloggt) -->
+<div id="mainContent" style="display: none;">
+
 <nav class="nav">
   <div class="nav-user" id="navUser" style="display:none;">
     <img id="navAvatar" src="" alt="MC Kopf">
@@ -19,6 +34,7 @@
   <div class="nav-links">
     <a href="index.html">Startseite</a>
     <a href="items.html" class="active">Inventar</a>
+    <a href="lager.html">Lager</a>
     <a href="kredite.html">Kredit</a>
   </div>
 </nav>
@@ -105,6 +121,11 @@
   </div>
 </div>
 
+</div><!-- Ende von mainContent -->
+
+<!-- =========================
+     SCRIPTS
+========================= -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
 <script src="notifications.js"></script>

@@ -1,11 +1,34 @@
 // =========================
-// LOGIN CHECK
+// LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-window.supabaseClient.auth.getSession().then(({ data }) => {
-  if (!data.session) {
-    window.location.href = "login.html";
-  }
+document.addEventListener("DOMContentLoaded", function() {
+  window.supabaseClient.auth.getSession().then(({ data }) => {
+    if (!data.session) {
+      // Nicht eingeloggt -> Login-Seite anzeigen
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'none';
+    } else {
+      // Eingeloggt -> Hauptinhalt anzeigen
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      initializeApp();
+    }
+  });
 });
+
+// =========================
+// APP INITIALISIERUNG (wird nur bei eingeloggten Nutzern aufgerufen)
+// =========================
+function initializeApp() {
+  loadProfile().then(() => {
+    loadAllProfiles().then(() => {
+      loadPlayers();
+      loadTeamItems();
+      setupEventListeners();
+      addGlobalEventListeners();
+    });
+  });
+}
 
 // =========================
 // GLOBALS
@@ -45,8 +68,6 @@ async function loadProfile() {
       `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
   }
-
-  await loadAllProfiles();
 }
 
 // =========================
@@ -519,6 +540,10 @@ async function loadTeamItems() {
 // ITEM TOGGLE
 // =========================
 async function toggleItem(itemId) {
+  // Item-Name aus dem DOM holen
+  const itemElement = document.querySelector(`[data-id="${itemId}"]`);
+  const itemName = itemElement ? itemElement.dataset.name || itemElement.querySelector('.item-name').textContent : 'Item';
+  
   const { data: existing } = await window.supabaseClient
     .from("team_item_usage")
     .select("id")
@@ -534,8 +559,8 @@ async function toggleItem(itemId) {
       .eq("id", existing.id);
     
     // Benachrichtigung
-    if (window.showNotification) {
-      window.showNotification("Item zurückgelegt", "success");
+    if (window.showTeamNotification) {
+      window.showTeamNotification(CURRENT_MC_NAME, `"${itemName}" zurückgelegt`, "success");
     }
   } else {
     // Item ausleihen
@@ -544,37 +569,13 @@ async function toggleItem(itemId) {
       .insert([{ item_id: itemId, user_id: CURRENT_USER_ID }]);
     
     // Benachrichtigung
-    if (window.showNotification) {
-      window.showNotification("Item ausgeliehen", "success");
+    if (window.showTeamNotification) {
+      window.showTeamNotification(CURRENT_MC_NAME, `"${itemName}" ausgeliehen`, "success");
     }
   }
   
   // UI aktualisieren
   await loadTeamItems();
-}
-
-// =========================
-// ITEM ENTFERNEN FUNKTIONEN
-// =========================
-async function removeItemFromDatabase(itemId, itemName, playerName) {
-  try {
-    // Direkt von team_items löschen (keine team_item_usage mehr)
-    const { error } = await window.supabaseClient
-      .from("team_items")
-      .delete()
-      .eq("id", itemId);
-    
-    if (error) {
-      console.error("Fehler beim Entfernen des Items:", error);
-      return false;
-    }
-    
-    return true;
-    
-  } catch (error) {
-    console.error("Fehler beim Entfernen des Items:", error);
-    return false;
-  }
 }
 
 // =========================
@@ -620,12 +621,11 @@ async function returnAllMyItems() {
         .eq("user_id", user.id);
 
       loadTeamItems();
-      showNotification('Alle Items wurden zurückgelegt.', 'success');
+      showNotification(`${CURRENT_MC_NAME} hat alle Items zurückgelegt.`, 'success');
     }
   );
 }
 
-// =========================
 // BENACHRICHTIGUNG ANZEIGEN
 // =========================
 function showNotification(message, type) {
@@ -1212,14 +1212,10 @@ function addCustomStyles() {
 // Die Login-Benachrichtigungen werden jetzt zentral über notifications.js verwaltet
 
 // =========================
-// INIT
+// INIT (wird über initializeApp() gesteuert)
 // =========================
-document.addEventListener("DOMContentLoaded", async () => {
+function addGlobalEventListeners() {
   addCustomStyles(); // Custom Styles hinzufügen
-  await loadProfile();
-  await loadPlayers();
-  loadTeamItems();
-  setupEventListeners();
   
   // Real-time Benachrichtigungen initialisieren
   if (window.setupRealtimeNotifications) {
@@ -1235,4 +1231,4 @@ document.addEventListener("DOMContentLoaded", async () => {
       hideAddItemModal();
     }
   });
-});
+}

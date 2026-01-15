@@ -7,19 +7,31 @@
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 </head>
-<body class="login-body">
+<body>
 
+  <!-- LOGIN-FORMULAR (IMMER SICHTBAR) -->
   <div class="login-overlay">
-    <img src="logo1.png" alt="Team Logo" class="login-logo">
-
-    <h2>Team Login</h2>
-
-    <input type="text" id="mcName" placeholder="Minecraft-Name">
-    <input type="password" id="password" placeholder="Passwort">
-
-    <button onclick="login()">Login</button>
-
-    <p id="error" class="login-error"></p>
+    <div class="login-overlay-content">
+      <img src="logo1.png" alt="Logo" class="login-logo-secondary">
+      <img src="logo.png" alt="Logo" class="login-logo">
+      <h2>Team Login</h2>
+      
+      <div class="login-status-info">
+        <p>Hier können sich Teammitglieder anmelden</p>
+        <p class="login-note">🔐 Geschützer Bereich für Teammitglieder</p>
+      </div>
+      
+      <input type="text" id="mcName" placeholder="Minecraft-Name" class="login-input">
+      <input type="password" id="password" placeholder="Passwort" class="login-input">
+      
+      <button onclick="login()" class="login-btn">
+        Login
+      </button>
+      
+      <div class="login-error-container">
+        <p id="error" class="login-error"></p>
+      </div>
+    </div>
   </div>
 
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>

@@ -167,14 +167,14 @@ function setupRealtimeNotifications() {
                 // Für sich selbst
                 showTeamNotification(
                   profile.mc_name,
-                  `Du hast dir ${item.name} ausgeliehen`,
+                  `${item.name} ausgeliehen`,
                   'success'
                 );
               } else {
                 // Für andere
                 showTeamNotification(
                   profile.mc_name,
-                  `${profile.mc_name} hat sich ${item.name} ausgeliehen`,
+                  `${profile.mc_name} hat ${item.name} ausgeliehen`,
                   'info'
                 );
               }
@@ -182,7 +182,7 @@ function setupRealtimeNotifications() {
               // Fallback wenn nicht eingeloggt
               showTeamNotification(
                 profile.mc_name,
-                `${profile.mc_name} hat sich ${item.name} ausgeliehen`,
+                `${profile.mc_name} hat ${item.name} ausgeliehen`,
                 'info'
               );
             }
@@ -223,7 +223,7 @@ function setupRealtimeNotifications() {
                 // Für sich selbst
                 showTeamNotification(
                   profile.mc_name,
-                  `Du hast ${item.name} zurückgelegt`,
+                  `${item.name} zurückgelegt`,
                   'success'
                 );
               } else {

@@ -1,3 +1,17 @@
+// =========================
+// LOGIN CHECK (NUR FÜR WEITERLEITUNG)
+// =========================
+// Die login.html sollte keine Session-Prüfung haben, da sie selbst die Login-Seite ist
+// Wir prüfen nur, ob der Benutzer bereits eingeloggt ist, um ihn weiterzuleiten
+
+window.supabaseClient.auth.getSession().then(({ data }) => {
+  if (data.session) {
+    // Wenn bereits eingeloggt, direkt zur Hauptseite weiterleiten
+    window.location.href = "index.html";
+  }
+  // Wenn nicht eingeloggt, bleibt der Benutzer auf der Login-Seite
+});
+
 async function login() {
   const mcNameInput = document.getElementById("mcName");
   const passwordInput = document.getElementById("password");
@@ -28,6 +42,5 @@ async function login() {
   }
 
   // ✅ Erfolgreich eingeloggt
-  // Login-Benachrichtigung wird nach dem Laden der Seite gesendet
   window.location.href = "index.html";
 }

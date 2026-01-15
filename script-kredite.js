@@ -1,4 +1,32 @@
 // =========================
+// LOGIN CHECK & SEITEN-WECHSEL
+// =========================
+document.addEventListener("DOMContentLoaded", function() {
+  window.supabaseClient.auth.getSession().then(({ data }) => {
+    if (!data.session) {
+      // Nicht eingeloggt -> Login-Seite anzeigen
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'none';
+    } else {
+      // Eingeloggt -> Hauptinhalt anzeigen
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      initializeApp();
+    }
+  });
+});
+
+// =========================
+// APP INITIALISIERUNG (wird nur bei eingeloggten Nutzern aufgerufen)
+// =========================
+function initializeApp() {
+  loadProfile();
+  loadTotalMembers();
+  loadCredits();
+  setupEventListeners();
+}
+
+// =========================
 // KOMPLETT NEUES KREDITSYSTEM (FIXED)
 // =========================
 let CURRENT_USER_ID = null;
@@ -548,6 +576,8 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 // =========================
+// INIT - ANGEPASSTE VERSION
+// =========================
 // MODAL FUNKTIONEN
 // =========================
 function hideVotingModal() {
@@ -555,44 +585,65 @@ function hideVotingModal() {
   if (votingModal) {
     votingModal.style.display = "none";
   }
-  SELECTED_CREDIT_ID = null;
 }
 
-// =========================
-// INITIALISIERUNG
-// =========================
-document.addEventListener("DOMContentLoaded", function() {
-  // Modal Event Listeners
-  const closeVotingModal = document.getElementById("closeVotingModal");
-  const votingModal = document.getElementById("votingModal");
+function setupModalListeners() {
+  // Close-Button für Voting-Modal
+  const closeVotingBtn = document.getElementById("closeVotingModal");
+  console.log("Close-Button gefunden:", closeVotingBtn); // Debug
   
-  if (closeVotingModal) {
-    closeVotingModal.addEventListener("click", hideVotingModal);
+  if (closeVotingBtn) {
+    closeVotingBtn.addEventListener("click", (e) => {
+      console.log("Close-Button geklickt!"); // Debug
+      e.preventDefault();
+      e.stopPropagation();
+      hideVotingModal();
+    });
+    
+    // Zusätzlich: Click-Event für alle Fälle
+    closeVotingBtn.addEventListener("mousedown", (e) => {
+      console.log("Close-Button mousedown!"); // Debug
+      e.preventDefault();
+      e.stopPropagation();
+      hideVotingModal();
+    });
   }
   
+  // Modal schließen wenn außerhalb geklickt wird
+  const votingModal = document.getElementById("votingModal");
   if (votingModal) {
-    votingModal.addEventListener("click", function(e) {
+    votingModal.addEventListener("click", (e) => {
       if (e.target === votingModal) {
         hideVotingModal();
       }
     });
   }
   
-  // ESC-Taste zum Schließen
-  document.addEventListener("keydown", function(e) {
+  // ESC Taste zum Schließen
+  document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
       hideVotingModal();
     }
   });
+}
+
+// =========================
+document.addEventListener("DOMContentLoaded", function() {
+  // Warten auf Login-Check, dann initialisieren
+  setTimeout(() => {
+    const mainContent = document.getElementById('mainContent');
+    if (mainContent && mainContent.style.display !== 'none') {
+      // Nur initialisieren wenn eingeloggt und Hauptinhalt sichtbar
+      setupModalListeners();
+      loadProfile();
+      loadTotalMembers();
+      loadCredits();
+    }
+  }, 100);
   
   // Logout-Button Event Listener
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", logout);
   }
-  
-  // Initialisierung
-  loadProfile();
-  loadTotalMembers();
-  loadCredits();
 });
