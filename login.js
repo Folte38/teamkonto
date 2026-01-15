@@ -12,18 +12,44 @@ window.supabaseClient.auth.getSession().then(({ data }) => {
   // Wenn nicht eingeloggt, bleibt der Benutzer auf der Login-Seite
 });
 
+// Formular-Submit Handler
+function handleLoginSubmit(event) {
+  event.preventDefault(); // Verhindert Seiten-Reload
+  login();
+}
+
+// Enter-Taste Event Listener
+document.addEventListener("DOMContentLoaded", function() {
+  const mcNameInput = document.getElementById("mcName");
+  const passwordInput = document.getElementById("password");
+  
+  // Enter-Taste in beiden Input-Feldern abfangen
+  mcNameInput.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      passwordInput.focus(); // Springe zum Passwort-Feld
+    }
+  });
+  
+  passwordInput.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      login(); // Führe Login aus
+    }
+  });
+});
+
 async function login() {
   const mcNameInput = document.getElementById("mcName");
   const passwordInput = document.getElementById("password");
   const errorEl = document.getElementById("error");
-
-  errorEl.innerText = "";
 
   const mcName = mcNameInput.value.trim().toLowerCase();
   const password = passwordInput.value;
 
   if (!mcName || !password) {
     errorEl.innerText = "Bitte Minecraft-Name und Passwort eingeben";
+    errorEl.style.display = "block";
     return;
   }
 
@@ -37,6 +63,7 @@ async function login() {
 
   if (error) {
     errorEl.innerText = "Login fehlgeschlagen (Name oder Passwort falsch)";
+    errorEl.style.display = "block";
     console.error(error);
     return;
   }

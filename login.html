@@ -6,13 +6,17 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+  <style>
+    body {
+      background: url("background_login.png") center / cover no-repeat;
+    }
+  </style>
 </head>
 <body>
 
   <!-- LOGIN-FORMULAR (IMMER SICHTBAR) -->
   <div class="login-overlay">
     <div class="login-overlay-content">
-      <img src="logo1.png" alt="Logo" class="login-logo-secondary">
       <img src="logo.png" alt="Logo" class="login-logo">
       <h2>Team Login</h2>
       
@@ -21,12 +25,14 @@
         <p class="login-note">🔐 Geschützer Bereich für Teammitglieder</p>
       </div>
       
-      <input type="text" id="mcName" placeholder="Minecraft-Name" class="login-input">
-      <input type="password" id="password" placeholder="Passwort" class="login-input">
-      
-      <button onclick="login()" class="login-btn">
-        Login
-      </button>
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)">
+        <input type="text" id="mcName" placeholder="Minecraft-Name" class="login-input">
+        <input type="password" id="password" placeholder="Passwort" class="login-input">
+        
+        <button type="submit" class="login-btn">
+          Login
+        </button>
+      </form>
       
       <div class="login-error-container">
         <p id="error" class="login-error"></p>
