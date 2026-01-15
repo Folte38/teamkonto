@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Regelwerk - OPSUCHT Team</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.ico">
+</head>
+<body>
+
+<!-- =========================
+     LOGIN OVERLAY
+========================= -->
+<div id="loginPage" class="login-overlay" style="display: none;">
+  <div class="login-container">
+    <img src="logo.png" alt="Logo" class="login-logo">
+    <h2>Team Login</h2>
+    <p class="login-subtitle">Nur für Teammitglieder</p>
+    <form id="loginForm">
+      <input type="email" id="loginEmail" placeholder="E-Mail" required>
+      <input type="password" id="loginPassword" placeholder="Passwort" required>
+      <button type="submit">Login</button>
+    </form>
+    <div id="loginError" class="login-error"></div>
+  </div>
+</div>
+
+<!-- =========================
+     MAIN CONTENT
+========================= -->
+<div id="mainContent" class="main-content">
+
+<!-- =========================
+     NAVIGATION
+========================= -->
+<nav class="nav">
+  <div class="nav-user" id="navUser" style="display:none;">
+    <img id="navAvatar" src="" alt="MC Kopf">
+    <span id="navUsername"></span>
+    <button id="logoutBtn" class="logout-btn" title="Ausloggen">🚪</button>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html" class="nav-link">Startseite</a>
+    <a href="items.html" class="nav-link">Inventar</a>
+    <a href="kredite.html" class="nav-link">Kredit</a>
+    <a href="lager.html" class="nav-link">Lager</a>
+    <a href="kalender.html" class="nav-link">Kalender</a>
+    <a href="regeln.html" class="nav-link active">Regelwerk</a>
+  </div>
+
+  <div class="nav-server-status" id="navServerStatus">
+    <div class="server-status-indicator" id="serverStatusIndicator">
+      <span class="server-status-icon" id="serverStatusIcon">🟢</span>
+      <span class="server-status-text" id="serverStatusText">Lädt...</span>
+    </div>
+    <div class="server-player-count" id="serverPlayerCount">
+      <span class="server-count-icon">👥</span>
+      <span class="server-count-text" id="serverCountText">0</span>
+      <span class="server-count-label">Online</span>
+    </div>
+  </div>
+</nav>
+
+<!-- =========================
+     PAGE CONTENT
+========================= -->
+<div class="page-box regeln-page">
+  
+  <!-- HEADER -->
+  <div class="regeln-header">
+    <h1 class="page-title">📋 TEAM-REGELWERK</h1>
+    <div class="regeln-meta">
+      <span class="last-updated" id="lastUpdated">Letzte Änderung: Samstag, 3. Januar 2026 23:33</span>
+      <button id="editRulesBtn" class="edit-btn" title="Regeln bearbeiten" style="display: none;">
+        ✏️ Bearbeiten
+      </button>
+    </div>
+  </div>
+
+  <!-- REGELN CONTAINER -->
+  <div class="regeln-container" id="regelnContainer">
+    <div class="regel-section">
+      <h2>§1 TEAMKASSE</h2>
+      <div class="regel-content">
+        <p>• Jedes Teammitglied zahlt wöchentlich 2.000.000 $ in die Teamkasse</p>
+        <p>• Die Zahlung gilt als fristgerecht, wenn sie innerhalb der jeweiligen Woche erfolgt</p>
+        <p>• Reallife geht vor (Arbeit, Schule, Urlaub, Krankheit)</p>
+        <p>→ Einzahlung kann für max. 1 Woche ausgesetzt werden</p>
+        <p>• Das Aussetzen muss vorab oder zeitnah im Discord gemeldet werden</p>
+        <p>• Während der Abwesenheit farmt das Team die wöchentlichen Einnahmen</p>
+        <p>• Aussetzen ohne Abmeldung gilt als Regelverstoß</p>
+      </div>
+    </div>
+
+    <div class="regel-section">
+      <h2>§2 GETEILTE WERKZEUGE & ITEMS</h2>
+      <div class="regel-content">
+        <p>• Jedes entnommene Werkzeug oder Item muss in der DC-Liste angekreuzt werden</p>
+        <p>• Werkzeuge & Items sind nach Nutzung zeitnah zurückzulegen</p>
+        <p>• Jedes Mitglied ist für den Zustand der entnommenen Items verantwortlich</p>
+        <p>• Verlorene oder zerstörte Werkzeuge müssen ersetzt oder finanziell ausgeglichen werden</p>
+        <p>• Jedes Item muss repariert zurückgelegt werden</p>
+      </div>
+    </div>
+
+    <div class="regel-section">
+      <h2>§3 NUTZUNG VON TEAMRESSOURCEN</h2>
+      <div class="regel-content">
+        <p>• Teamressourcen sind primär für Teamzwecke gedacht</p>
+        <p>• Größere Mengen für private Großprojekte nur nach Absprache erlaubt</p>
+        <p>• Nicht abgesprochene Nutzung gilt als Missbrauch</p>
+      </div>
+    </div>
+
+    <div class="regel-section">
+      <h2>§4 FAIRPLAY & EHRLICHKEIT</h2>
+      <div class="regel-content">
+        <p>• Ehrlichkeit hat oberste Priorität</p>
+        <p>• Regelverstöße, die freiwillig gemeldet werden, werden milder behandelt</p>
+        <p>• Lügen, Verschweigen oder Manipulation gelten als schwerer Verstoß</p>
+        <p>• In solchen Fällen können Strafen verschärft (z. B. ×2) werden</p>
+      </div>
+    </div>
+
+    <div class="regel-section">
+      <h2>§5 SANKTIONEN</h2>
+      <div class="regel-content">
+        <p>• Verstöße werden gemäß dem Team-Strafenkatalog geahndet</p>
+        <p>• Strafen dienen der Fairness und dem Erhalt des Teams</p>
+        <p>• Bei Sonderfällen entscheidet das Team gemeinsam</p>
+      </div>
+    </div>
+
+    <div class="regel-section">
+      <h2>§6 GÜLTIGKEIT</h2>
+      <div class="regel-content">
+        <p>• Dieses Regelwerk gilt für alle Teammitglieder gleichermaßen</p>
+        <p>• Mit Verbleib im Team erkennt jedes Mitglied die Regeln an</p>
+        <p>• Änderungen werden im Discord bekannt gegeben</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- Ende von mainContent -->
+
+<!-- =========================
+     EDIT MODAL
+========================= -->
+<div id="editModal" class="modal-overlay" style="display: none;">
+  <div class="modal-content regeln-modal">
+    <div class="modal-header">
+      <h2>✏️ Regeln bearbeiten</h2>
+      <button id="closeEditModal" class="modal-close">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="regelnText">Regelwerk bearbeiten:</label>
+        <textarea id="regelnText" class="regeln-textarea" rows="20" placeholder="Regeln hier bearbeiten..."></textarea>
+      </div>
+      
+      <div class="form-group">
+        <label for="changeNote">Änderungsnotiz (wird im Änderungsprotokoll angezeigt):</label>
+        <input type="text" id="changeNote" class="form-input" placeholder="z.B. §2 aktualisiert mit neuen Item-Regeln">
+      </div>
+      
+      <div class="modal-actions">
+        <button id="saveRegeln" class="btn-primary">Speichern</button>
+        <button id="cancelEdit" class="btn-cancel">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- Ende von mainContent -->
+
+<!-- =========================
+     SCRIPTS
+========================= -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="notifications.js"></script>
+<script src="logout.js"></script>
+<script src="script-regeln.js"></script>
+
+</body>
+</html>

@@ -12,9 +12,76 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('loginPage').style.display = 'none';
       document.getElementById('mainContent').style.display = 'block';
       initializeApp();
+      initializeServerStatus();
     }
   });
 });
+
+// =========================
+// SERVER STATUS FUNKTIONEN
+// =========================
+function initializeServerStatus() {
+  updateServerStatus();
+  // Alle 30 Sekunden aktualisieren
+  setInterval(updateServerStatus, 30000);
+}
+
+async function updateServerStatus() {
+  try {
+    // mcstatus.io API für Java-Server
+    const response = await fetch('https://api.mcstatus.io/v2/status/java/opsucht.net');
+    const data = await response.json();
+    
+    if (data && data.online) {
+      updateServerDisplay('online', data.players?.online || 0);
+    } else {
+      updateServerDisplay('offline', 0);
+    }
+  } catch (error) {
+    console.error('Fehler beim Abrufen des Server-Status:', error);
+    updateServerDisplay('error', 0);
+  }
+}
+
+function updateServerDisplay(status, playerCount) {
+  console.log("🔍 DEBUG updateServerDisplay aufgerufen:", { status, playerCount });
+  
+  const statusIcon = document.getElementById('serverStatusIcon');
+  const statusText = document.getElementById('serverStatusText');
+  const countText = document.getElementById('serverCountText');
+  
+  console.log("🔍 DEBUG Elemente gefunden:", {
+    statusIcon: !!statusIcon,
+    statusText: !!statusText,
+    countText: !!countText
+  });
+  
+  if (!statusIcon || !statusText || !countText) {
+    console.log("❌ DEBUG: Nicht alle Elemente gefunden!");
+    return;
+  }
+  
+  switch (status) {
+    case 'online':
+      console.log("✅ Setze Status auf Online mit", playerCount, "Spielern");
+      statusIcon.textContent = '🟢';
+      statusText.textContent = 'Online';
+      countText.textContent = playerCount;
+      break;
+    case 'offline':
+      console.log("✅ Setze Status auf Offline");
+      statusIcon.textContent = '🔴';
+      statusText.textContent = 'Offline';
+      countText.textContent = '0';
+      break;
+    case 'error':
+      console.log("✅ Setze Status auf Fehler");
+      statusIcon.textContent = '🟡';
+      statusText.textContent = 'Fehler';
+      countText.textContent = '?';
+      break;
+  }
+}
 
 // =========================
 // APP INITIALISIERUNG (wird nur bei eingeloggten Nutzern aufgerufen)
@@ -629,15 +696,19 @@ function setupModalListeners() {
 
 // =========================
 document.addEventListener("DOMContentLoaded", function() {
+  console.log("🚀 Kredite-Seite DOMContentLoaded gestartet");
+  
   // Warten auf Login-Check, dann initialisieren
   setTimeout(() => {
     const mainContent = document.getElementById('mainContent');
     if (mainContent && mainContent.style.display !== 'none') {
       // Nur initialisieren wenn eingeloggt und Hauptinhalt sichtbar
+      console.log("🔍 MainContent sichtbar, starte Initialisierung");
       setupModalListeners();
       loadProfile();
       loadTotalMembers();
       loadCredits();
+      initializeServerStatus(); // Server-Status hier initialisieren
     }
   }, 100);
   

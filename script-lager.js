@@ -11,8 +11,61 @@ window.supabaseClient.auth.getSession().then(({ data }) => {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
     loadProfile();
+    initializeServerStatus();
   }
 });
+
+// =========================
+// SERVER STATUS FUNKTIONEN
+// =========================
+function initializeServerStatus() {
+  updateServerStatus();
+  // Alle 30 Sekunden aktualisieren
+  setInterval(updateServerStatus, 30000);
+}
+
+async function updateServerStatus() {
+  try {
+    // mcstatus.io API für Java-Server
+    const response = await fetch('https://api.mcstatus.io/v2/status/java/opsucht.net');
+    const data = await response.json();
+    
+    if (data && data.online) {
+      updateServerDisplay('online', data.players?.online || 0);
+    } else {
+      updateServerDisplay('offline', 0);
+    }
+  } catch (error) {
+    console.error('Fehler beim Abrufen des Server-Status:', error);
+    updateServerDisplay('error', 0);
+  }
+}
+
+function updateServerDisplay(status, playerCount) {
+  const statusIcon = document.getElementById('serverStatusIcon');
+  const statusText = document.getElementById('serverStatusText');
+  const countText = document.getElementById('serverCountText');
+  
+  if (!statusIcon || !statusText || !countText) return;
+  
+  switch (status) {
+    case 'online':
+      statusIcon.textContent = '🟢';
+      statusText.textContent = 'Online';
+      countText.textContent = playerCount;
+      break;
+    case 'offline':
+      statusIcon.textContent = '🔴';
+      statusText.textContent = 'Offline';
+      countText.textContent = '0';
+      break;
+    case 'error':
+      statusIcon.textContent = '🟡';
+      statusText.textContent = 'Fehler';
+      countText.textContent = '?';
+      break;
+  }
+}
 
 // =========================
 // DATUMS-FORMATIERUNG
