@@ -53,21 +53,80 @@ async function login() {
     return;
   }
 
-  // 👉 Interne Fake-Mail aus MC-Namen bauen
-  const email = `${mcName}@teamhp.local`;
+  try {
+    // 1. Zuerst prüfen, ob Profil existiert und additional_password überprüfen
+    console.log("Suche Profil für:", mcName);
+    
+    // Case-insensitive Suche: zuerst alle Profile holen und dann im JavaScript filtern
+    const { data: profiles, error: profilesError } = await supabaseClient
+      .from('profiles')
+      .select('additional_password, mc_name');
+    
+    if (profilesError) {
+      console.error("Datenbank-Fehler:", profilesError);
+      errorEl.innerText = "Datenbank-Fehler. Bitte kontaktiere einen Admin.";
+      errorEl.style.display = "block";
+      return;
+    }
+    
+    // Case-insensitive Filterung
+    const profile = profiles.find(p => p.mc_name.toLowerCase() === mcName.toLowerCase());
+    
+    console.log("Gefundenes Profil:", profile);
 
-  const { error } = await window.supabaseClient.auth.signInWithPassword({
-    email,
-    password
-  });
+    if (!profile) {
+      console.log("Kein Profil gefunden für:", mcName);
+      errorEl.innerText = `Profil für "${mcName}" nicht gefunden. Bitte wende dich an einen Admin.`;
+      errorEl.style.display = "block";
+      return;
+    }
 
-  if (error) {
-    errorEl.innerText = "Login fehlgeschlagen (Name oder Passwort falsch)";
+    // 2. Zusätzliches Passwort überprüfen (falls gesetzt)
+    if (profile.additional_password && profile.additional_password.trim() !== '') {
+      console.log("Prüfe additional_password...");
+      if (profile.additional_password === password) {
+        // additional_password stimmt überein - Login mit localStorage
+        localStorage.setItem('currentUser', JSON.stringify({
+          mc_name: profile.mc_name,
+          id: profile.mc_name,
+          authenticated: true,
+          method: 'additional_password'
+        }));
+        
+        console.log("Login erfolgreich mit additional_password!");
+        window.location.href = "index.html";
+        return;
+      }
+      // additional_password stimmt nicht überein - aber vielleicht ist es das Supabase Passwort
+      console.log("additional_password falsch, versuche Supabase Auth...");
+    }
+    
+    // 3. Supabase Authentication versuchen (immer, egal ob additional_password existiert)
+    console.log("Versuche Supabase Auth mit:", `${mcName}@teamhp.local`);
+    const { error: authError } = await window.supabaseClient.auth.signInWithPassword({
+      email: `${mcName}@teamhp.local`,
+      password
+    });
+
+    if (authError) {
+      // Wenn additional_password existiert aber falsch war, spezifische Meldung
+      if (profile.additional_password && profile.additional_password.trim() !== '') {
+        errorEl.innerText = "Passwort falsch. Bitte überprüfe deine Eingabe (additional_password oder Supabase Passwort).";
+      } else {
+        errorEl.innerText = "Login fehlgeschlagen. Bitte überprüfe Name und Passwort.";
+      }
+      errorEl.style.display = "block";
+      console.error("Supabase Auth-Fehler:", authError);
+      return;
+    }
+
+    // ✅ Erfolgreich mit Supabase eingeloggt
+    console.log("Login erfolgreich mit Supabase!");
+    window.location.href = "index.html";
+
+  } catch (error) {
+    errorEl.innerText = "Unerwarteter Fehler beim Login. Bitte versuche es erneut.";
     errorEl.style.display = "block";
-    console.error(error);
-    return;
+    console.error("Login-Exception:", error);
   }
-
-  // ✅ Erfolgreich eingeloggt
-  window.location.href = "index.html";
 }

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Marktplatz - OPSUCHT Team Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.ico">
+</head>
+<body class="marktplatz-page">
+
+<!-- LOGIN-SEITE (wird angezeigt wenn nicht eingeloggt) -->
+<div id="loginPage" class="login-overlay" style="display: none;">
+  <div class="login-overlay-content">
+    <h2>🔐 Anmeldung erforderlich</h2>
+    <p>Du musst angemeldet sein, um auf den Marktplatz zugreifen zu können.</p>
+    <button onclick="window.location.href='login.html'" class="login-btn">
+      Zum Login
+    </button>
+  </div>
+</div>
+
+<!-- HAUPTINHALT (wird angezeigt wenn eingeloggt) -->
+<div id="mainContent" style="display: none;">
+
+<!-- NAVIGATION -->
+<nav class="nav">
+  <div class="nav-user" id="navUser" style="display:none;">
+    <div class="nav-user-dropdown" id="navUserDropdown">
+      <div class="nav-user-trigger" id="navUserTrigger">
+        <img id="navAvatar" src="" alt="MC Kopf">
+        <span id="navUsername"></span>
+        <span class="nav-user-dropdown-arrow">▼</span>
+      </div>
+      <div class="nav-user-menu">
+        <div class="nav-user-menu-header">Profil verwalten</div>
+        <button class="nav-user-menu-item" id="changePasswordBtn">
+          <span class="nav-user-menu-item-icon">🔐</span>
+          <span>Passwort ändern</span>
+        </button>
+        <div class="nav-user-menu-divider"></div>
+        <button class="nav-user-menu-item" id="logoutBtn">
+          <span class="nav-user-menu-item-icon">🚪</span>
+          <span>Ausloggen</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-links">
+    <a href="index.html">Startseite</a>
+    <a href="items.html">Inventar</a>
+    <a href="lager.html">Lager</a>
+    <a href="marktplatz.html" class="active">Marktplatz</a>
+    <a href="kalender.html">Kalender</a>
+    <a href="kredite.html">Kredit</a>
+    <a href="regeln.html">Regelwerk</a>
+    <a href="strafkatalog.html">Strafkatalog</a>
+  </div>
+
+  <div class="nav-server-status" id="navServerStatus">
+    <div class="server-status-indicator" id="serverStatusIndicator">
+      <span class="server-status-icon" id="serverStatusIcon">🟢</span>
+      <span class="server-status-text" id="serverStatusText">Lädt...</span>
+    </div>
+    <div class="server-player-count" id="serverPlayerCount">
+      <span class="server-count-icon">👥</span>
+      <span class="server-count-text" id="serverCountText">0</span>
+      <span class="server-count-label">Online</span>
+    </div>
+  </div>
+</nav>
+
+<!-- MARKT DASHBOARD -->
+<div class="page-box">
+  <div class="market-dashboard">
+    
+    <!-- Header -->
+    <div class="market-header">
+      <h1 class="market-title">
+        <span>🏪</span>
+        <span>OPSucht Marktplatz</span>
+      </h1>
+      <p class="market-subtitle">Live-Marktpreise & Trading Analytics für OPSUCHT.net</p>
+      
+      <div class="market-stats">
+        <div class="stat-card">
+          <div class="stat-value" id="totalItems">0</div>
+          <div class="stat-label">Total Items</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgPrice">0</div>
+          <div class="stat-label">Durchschnittspreis</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="lastUpdate">--:--</div>
+          <div class="stat-label">Letzte Aktualisierung</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="marketTrend">📊</div>
+          <div class="stat-label">Markt-Trend</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Controls -->
+    <div class="market-controls">
+      <input type="text" class="search-box" id="searchBox" placeholder="🔍 Suche Items...">
+      <button class="filter-btn active" data-category="all">Alle</button>
+      <button class="filter-btn" data-category="Holz">Holz</button>
+      <button class="filter-btn" data-category="Bergbau">Bergbau</button>
+      <button class="filter-btn" data-category="Nahrung">Nahrung</button>
+      <button class="filter-btn" data-category="Kampf">Kampf</button>
+      <button class="filter-btn" data-category="Besonderes">Besonderes</button>
+      <button class="refresh-btn" id="refreshBtn">🔄 Aktualisieren</button>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="market-content">
+      
+      <!-- Items Grid -->
+      <div class="items-grid" id="itemsGrid">
+        <div class="loading">🔄 Lade Marktpreise...</div>
+      </div>
+      
+      <!-- Sidebar -->
+      <div class="sidebar">
+        
+        <!-- Top Movers -->
+        <div class="top-movers">
+          <h3 class="section-title">
+            <span>📈</span>
+            <span>Top Bewegungen</span>
+          </h3>
+          <div id="topMovers">
+            <div class="loading">🔄 Lade...</div>
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- Ende von mainContent -->
+
+<!-- ITEM DETAILS MODAL -->
+<div class="modal-overlay" id="itemDetailsModal" style="display: none;">
+  <div class="modal-content item-details-modal">
+    <div class="modal-header">
+      <h2 id="itemModalTitle">📦 Item Details</h2>
+      <button class="modal-close" id="closeItemModalBtn">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Item Info -->
+      <div class="item-info-section">
+        <div class="item-modal-icon" id="itemModalIcon">📦</div>
+        <div class="item-modal-details">
+          <h3 id="itemModalName">Item Name</h3>
+          <div class="item-modal-category" id="itemModalCategory">Kategorie</div>
+          <div class="item-modal-prices">
+            <div class="price-buy-modal" id="itemModalBuyPrice">BUY: 0 $</div>
+            <div class="price-sell-modal" id="itemModalSellPrice">SELL: 0 $</div>
+          </div>
+          <div class="item-modal-players" id="itemModalPlayers">
+            <!-- MC-Heads der Spieler mit diesem Item -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Spieler Liste -->
+      <div class="item-players-section">
+        <h3>👥 Spieler mit diesem Item</h3>
+        <div class="players-list" id="itemPlayersList">
+          <div class="loading">🔄 Lade Spieler...</div>
+        </div>
+      </div>
+      
+      <!-- Eintragen Formular -->
+      <div class="item-entry-section">
+        <h3>➕ Spieler eintragen</h3>
+        <form id="itemEntryForm">
+          <div class="form-group">
+            <label for="playerSelect">Spieler:</label>
+            <select id="playerSelect" required>
+              <option value="">-- Spieler auswählen --</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="itemAmount">Menge:</label>
+            <input type="number" id="itemAmount" min="1" value="1" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="itemNote">Notiz:</label>
+            <textarea id="itemNote" placeholder="Optionale Notiz..." rows="3"></textarea>
+          </div>
+          
+          <div class="form-actions">
+            <button type="submit" class="btn-submit">Eintragen</button>
+            <button type="button" class="btn-cancel" id="cancelItemEntryBtn">Abbrechen</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PASSWORD MODAL -->
+<div class="password-modal-overlay" id="passwordModalOverlay"></div>
+<div class="password-modal" id="passwordModal">
+  <div class="password-modal-header">
+    <h3 class="password-modal-title">
+      <span>🔐</span>
+      <span>Passwort ändern</span>
+    </h3>
+    <button class="password-modal-close" id="passwordModalClose">×</button>
+  </div>
+  
+  <div class="password-modal-body">
+    <form id="passwordForm" class="password-form">
+      <div class="password-form-group">
+        <label class="password-form-label" for="currentPassword">Aktuelles Passwort</label>
+        <input type="password" id="currentPassword" class="password-form-input" placeholder="Aktuelles Passwort eingeben" required>
+      </div>
+      
+      <div class="password-form-group">
+        <label class="password-form-label" for="newPassword">Neues Passwort</label>
+        <input type="password" id="newPassword" class="password-form-input" placeholder="Neues Passwort eingeben" required minlength="6">
+      </div>
+      
+      <div class="password-form-group">
+        <label class="password-form-label" for="confirmPassword">Passwort bestätigen</label>
+        <input type="password" id="confirmPassword" class="password-form-input" placeholder="Neues Passwort bestätigen" required minlength="6">
+      </div>
+      
+      <div class="password-form-actions">
+        <button type="button" class="password-btn password-btn-cancel" id="passwordCancelBtn">Abbrechen</button>
+        <button type="submit" class="password-btn password-btn-save">Speichern</button>
+      </div>
+      
+      <div id="passwordMessage" class="password-message" style="display: none;"></div>
+    </form>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="supabase.js"></script>
+<script src="auth-helper.js"></script>
+<script src="notifications.js"></script>
+<script src="logout.js"></script>
+<script src="password-management.js"></script>
+<script src="script-marktplatz.js"></script>
+
+</body>
+</html>

@@ -34,19 +34,36 @@
 ========================= -->
 <nav class="nav">
   <div class="nav-user" id="navUser" style="display:none;">
-    <img id="navAvatar" src="" alt="MC Kopf">
-    <span id="navUsername"></span>
-    <button id="logoutBtn" class="logout-btn" title="Ausloggen">🚪</button>
+    <div class="nav-user-dropdown" id="navUserDropdown">
+      <div class="nav-user-trigger" id="navUserTrigger">
+        <img id="navAvatar" src="" alt="MC Kopf">
+        <span id="navUsername"></span>
+        <span class="nav-user-dropdown-arrow">▼</span>
+      </div>
+      <div class="nav-user-menu">
+        <div class="nav-user-menu-header">Profil verwalten</div>
+        <button class="nav-user-menu-item" id="changePasswordBtn">
+          <span class="nav-user-menu-item-icon">🔐</span>
+          <span>Passwort ändern</span>
+        </button>
+        <div class="nav-user-menu-divider"></div>
+        <button class="nav-user-menu-item" id="logoutBtn">
+          <span class="nav-user-menu-item-icon">🚪</span>
+          <span>Ausloggen</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <div class="nav-links">
     <a href="index.html">Startseite</a>
     <a href="items.html">Inventar</a>
     <a href="lager.html">Lager</a>
+    <a href="marktplatz.html">Marktplatz</a>
     <a href="kalender.html" class="active">Kalender</a>
     <a href="kredite.html">Kredit</a>
-    <a href="strafkatalog.html">Strafkatalog</a>
     <a href="regeln.html">Regelwerk</a>
+    <a href="strafkatalog.html">Strafkatalog</a>
   </div>
 
   <div class="nav-server-status" id="navServerStatus">
@@ -142,13 +159,53 @@
 
 </div><!-- Ende von mainContent -->
 
+<!-- PASSWORD MODAL -->
+<div class="password-modal-overlay" id="passwordModalOverlay"></div>
+<div class="password-modal" id="passwordModal">
+  <div class="password-modal-header">
+    <h3 class="password-modal-title">
+      <span>🔐</span>
+      <span>Passwort ändern</span>
+    </h3>
+    <button class="password-modal-close" id="passwordModalClose">×</button>
+  </div>
+  
+  <div class="password-modal-body">
+    <form id="passwordForm" class="password-form">
+      <div class="password-form-group">
+        <label class="password-form-label" for="currentPassword">Aktuelles Passwort</label>
+        <input type="password" id="currentPassword" class="password-form-input" placeholder="Aktuelles Passwort eingeben" required>
+      </div>
+      
+      <div class="password-form-group">
+        <label class="password-form-label" for="newPassword">Neues Passwort</label>
+        <input type="password" id="newPassword" class="password-form-input" placeholder="Neues Passwort eingeben" required minlength="6">
+      </div>
+      
+      <div class="password-form-group">
+        <label class="password-form-label" for="confirmPassword">Passwort bestätigen</label>
+        <input type="password" id="confirmPassword" class="password-form-input" placeholder="Neues Passwort bestätigen" required minlength="6">
+      </div>
+      
+      <div class="password-form-actions">
+        <button type="button" class="password-btn password-btn-cancel" id="passwordCancelBtn">Abbrechen</button>
+        <button type="submit" class="password-btn password-btn-save">Speichern</button>
+      </div>
+      
+      <div id="passwordMessage" class="password-message" style="display: none;"></div>
+    </form>
+  </div>
+</div>
+
 <!-- =========================
      SCRIPTS
 ========================= -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="supabase.js"></script>
+<script src="auth-helper.js"></script>
 <script src="notifications.js"></script>
 <script src="logout.js"></script>
+<script src="password-management.js"></script>
 <script src="script-kalender.js"></script>
 
 </body>

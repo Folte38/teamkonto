@@ -3,8 +3,10 @@
 // =========================
 
 // LOGIN CHECK & SEITEN-WECHSEL
-window.supabaseClient.auth.getSession().then(({ data }) => {
-  if (!data.session) {
+async function checkLoginStatus() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'none';
   } else {
@@ -19,8 +21,10 @@ window.supabaseClient.auth.getSession().then(({ data }) => {
       }, 1000);
     }
   }
-  // Wenn nicht eingeloggt, bleibt der Benutzer auf der Login-Seite
-});
+}
+
+// Auth-Check starten
+checkLoginStatus();
 
 // APP INITIALISIERUNG
 function initializeApp() {
@@ -404,16 +408,24 @@ async function loadTeamGoals() {
 
 // PROFIL & NAV
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return Promise.resolve();
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-  const { data: profile, error } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
 
-  if (error || !profile) return Promise.resolve();
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
   IS_ADMIN = profile.role === "admin";
 
@@ -438,7 +450,7 @@ async function loadProfile() {
     if (goalAddBtn) {
       goalAddBtn.style.display = IS_ADMIN ? "flex" : "none";
     }
-  }, 0);
+  }, 500);
   
   return Promise.resolve();
 }
