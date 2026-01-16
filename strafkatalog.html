@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kalender - OPSUCHT Team</title>
+  <title>Strafkatalog - OPSUCHT Team</title>
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="favicon.ico">
   <style>
     body {
-      background: url("background_kalender.png") center / cover no-repeat;
+      background: url("background_regeln.png") center / cover no-repeat;
     }
   </style>
 </head>
@@ -19,7 +19,7 @@
   <div class="login-overlay-content">
     <img src="logo.png" alt="Logo" class="login-logo">
     <h2>🔐 Anmeldung erforderlich</h2>
-    <p>Du musst angemeldet sein, um auf den Team Kalender zugreifen zu können.</p>
+    <p>Du musst angemeldet sein, um auf den Strafkatalog zugreifen zu können.</p>
     <button onclick="window.location.href='login.html'" class="login-btn">
       Zum Login
     </button>
@@ -45,7 +45,7 @@
     <a href="kredite.html" class="nav-link">Kredite</a>
     <a href="lager.html" class="nav-link">Lager</a>
     <a href="kalender.html" class="nav-link">Kalender</a>
-    <a href="strafkatalog.html" class="nav-link">Strafkatalog</a>
+    <a href="strafkatalog.html" class="nav-link active">Strafkatalog</a>
     <a href="regeln.html" class="nav-link">Regelwerk</a>
   </div>
 
@@ -73,12 +73,12 @@
   </div>
 
   <!-- =========================
-       KALENDER HEADER
+       STRAFKATALOG HEADER
   ========================= -->
   <div class="kalender-header">
     <div class="kalender-title">
-      <h2>📅 Team Kalender</h2>
-      <p class="kalender-subtitle">Mehrere Spieler pro Tag möglich</p>
+      <h2>⚖️ Strafkatalog</h2>
+      <p class="kalender-subtitle">Strafen für Spieler verwalten (Nur Admins)</p>
     </div>
     
     <div class="kalender-controls">
@@ -108,7 +108,7 @@
   </div>
 
   <!-- =========================
-       SPIELER-AUSWAHL MODAL
+       STRAFEN-AUSWAHL MODAL
   ========================= -->
   <div id="playerModal" class="modal-overlay" style="display: none;">
     <div class="modal-content kalender-modal">
@@ -128,6 +128,25 @@
           <h4>👥 Ausgewählte Spieler:</h4>
           <div class="selected-players-list" id="selectedPlayersList">
             <!-- Ausgewählte Spieler werden hier angezeigt -->
+          </div>
+        </div>
+        
+        <div class="strafe-section">
+          <label for="strafeSelect" class="strafe-label">⚖️ Strafe (optional):</label>
+          <select id="strafeSelect" class="strafe-input">
+            <option value="">Keine Strafe ausgewählt</option>
+            <option value="griefing" data-amount="50">Griefing - $50</option>
+            <option value="spam" data-amount="20">Spam - $20</option>
+            <option value="beleidigung" data-amount="30">Beleidigung - $30</option>
+            <option value="cheating" data-amount="100">Cheating - $100</option>
+            <option value="regeln_verletzung" data-amount="25">Regelverletzung - $25</option>
+            <option value="bugusing" data-amount="40">Bugusing - $40</option>
+            <option value="teamkill" data-amount="35">Teamkill - $35</option>
+            <option value="diebstahl" data-amount="60">Diebstahl - $60</option>
+          </select>
+          
+          <div class="strafe-amount-display" id="strafeAmountDisplay" style="display: none;">
+            <strong>Strafsumme: $<span id="strafeAmount">0</span></strong>
           </div>
         </div>
         
@@ -154,7 +173,7 @@
 <script src="supabase.js"></script>
 <script src="notifications.js"></script>
 <script src="logout.js"></script>
-<script src="script-kalender.js"></script>
+<script src="script-strafkatalog.js"></script>
 
 </body>
 </html>

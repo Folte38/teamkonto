@@ -8,14 +8,53 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('loginPage').style.display = 'flex';
       document.getElementById('mainContent').style.display = 'none';
     } else {
-      // Eingeloggt - zeige Inhalt
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      initializeApp();
-      initializeServerStatus();
+      // Eingeloggt - prüfe Admin-Rechte
+      checkAdminAndInitialize(data.session.user.id);
     }
   });
 });
+
+// =========================
+// ADMIN-BERECHTIGUNG PRÜFEN
+// =========================
+async function checkAdminAndInitialize(userId) {
+  try {
+    const { data: profile } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", userId)
+      .single();
+
+    if (!profile || profile.role !== "admin") {
+      // Kein Admin - zeige Fehlerseite
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'none';
+      
+      const loginContent = document.querySelector('.login-overlay-content');
+      loginContent.innerHTML = `
+        <img src="logo.png" alt="Logo" class="login-logo">
+        <h2>🚫 Zugriff verweigert</h2>
+        <p>Du benötigst Admin-Rechte, um auf den Strafkatalog zugreifen zu können.</p>
+        <button onclick="window.location.href='index.html'" class="login-btn">
+          Zurück zur Startseite
+        </button>
+      `;
+      return;
+    }
+
+    // Admin - zeige Inhalt
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    initializeApp();
+    initializeServerStatus();
+    
+  } catch (error) {
+    console.error('Fehler bei der Admin-Prüfung:', error);
+    // Bei Fehler auch Zugriff verweigern
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+  }
+}
 
 // =========================
 // SERVER STATUS FUNKTIONEN
@@ -90,6 +129,18 @@ let ALL_PROFILES = [];
 let CURRENT_DATE = new Date();
 let SELECTED_DATE = null;
 let SELECTED_PLAYERS = new Set(); // Set für ausgewählte Spieler
+
+// Strafen-Definitionen
+const STRAFEN = {
+  griefing: { name: "Griefing", amount: 50 },
+  spam: { name: "Spam", amount: 20 },
+  beleidigung: { name: "Beleidigung", amount: 30 },
+  cheating: { name: "Cheating", amount: 100 },
+  regeln_verletzung: { name: "Regelverletzung", amount: 25 },
+  bugusing: { name: "Bugusing", amount: 40 },
+  teamkill: { name: "Teamkill", amount: 35 },
+  diebstahl: { name: "Diebstahl", amount: 60 }
+};
 
 // =========================
 // PROFIL & NAV
@@ -186,8 +237,8 @@ function renderKalender() {
     const currentDate = new Date(year, month, day);
     const dateString = formatDateForDB(currentDate);
     
-    // Prüfen ob für diesen Tag ein Spieler eingetragen ist
-    loadPlayerForDate(dateString, dayElement);
+    // Prüfen ob für diesen Tag ein Strafeintrag existiert
+    loadStrafeForDate(dateString, dayElement);
     
     // Klick-Event hinzufügen
     dayElement.addEventListener('click', () => openPlayerModal(currentDate, dayElement));
@@ -221,33 +272,30 @@ function formatDateDisplay(date) {
   return date.toLocaleDateString('de-DE', options);
 }
 
-async function loadPlayerForDate(dateString, dayElement) {
+async function loadStrafeForDate(dateString, dayElement) {
   try {
     const { data: entry } = await window.supabaseClient
-      .from("kalender_eintraege")
-      .select("mc_name, note")
+      .from("strafkatalog_eintraege")
+      .select("players, note, strafe_type, strafe_amount")
       .eq("date", dateString)
       .single();
     
     if (entry) {
       dayElement.classList.add('has-player');
+      dayElement.classList.add('has-strafe');
       
-      // Prüfen ob Note JSON mit mehreren Spielern enthält
       let players = [];
       let note = '';
+      let strafeType = '';
+      let strafeAmount = 0;
       
       try {
-        const noteData = JSON.parse(entry.note || '{}');
-        if (noteData.players && Array.isArray(noteData.players)) {
-          players = noteData.players;
-        }
-        if (noteData.text) {
-          note = noteData.text;
-        }
-      } catch (e) {
-        // Altes Format: einzelner Spieler in mc_name, Notiz in note
-        players = [entry.mc_name];
+        players = entry.players || [];
         note = entry.note || '';
+        strafeType = entry.strafe_type || '';
+        strafeAmount = entry.strafe_amount || 0;
+      } catch (e) {
+        console.error('Fehler beim Parsen der Strafdaten:', e);
       }
       
       let dayHtml = `
@@ -279,6 +327,16 @@ async function loadPlayerForDate(dateString, dayElement) {
       
       dayHtml += `</div>`;
       
+      // Strafe anzeigen falls vorhanden
+      if (strafeType && strafeAmount > 0) {
+        const strafeName = STRAFEN[strafeType]?.name || strafeType;
+        dayHtml += `
+          <div class="strafe-indicator" title="${strafeName} - $${strafeAmount}">
+            ⚖️ $${strafeAmount}
+          </div>
+        `;
+      }
+      
       // Notiz anzeigen falls vorhanden
       if (note && note.trim()) {
         dayHtml += `
@@ -304,6 +362,9 @@ async function openPlayerModal(date, dayElement) {
   const playerGrid = document.getElementById('playerGrid');
   const noteInput = document.getElementById('dayNote');
   const selectedPlayersList = document.getElementById('selectedPlayersList');
+  const strafeSelect = document.getElementById('strafeSelect');
+  const strafeAmountDisplay = document.getElementById('strafeAmountDisplay');
+  const strafeAmount = document.getElementById('strafeAmount');
   
   modalTitle.textContent = formatDateDisplay(date);
   
@@ -332,29 +393,19 @@ async function openPlayerModal(date, dayElement) {
   try {
     const dateString = formatDateForDB(date);
     const { data: entry } = await window.supabaseClient
-      .from("kalender_eintraege")
-      .select("mc_name, note")
+      .from("strafkatalog_eintraege")
+      .select("players, note, strafe_type, strafe_amount")
       .eq("date", dateString)
       .single();
     
     if (entry) {
       let players = [];
       let note = '';
+      let strafeType = '';
       
-      // Prüfen ob neues JSON-Format
-      try {
-        const noteData = JSON.parse(entry.note || '{}');
-        if (noteData.players && Array.isArray(noteData.players)) {
-          players = noteData.players;
-        }
-        if (noteData.text) {
-          note = noteData.text;
-        }
-      } catch (e) {
-        // Altes Format
-        players = [entry.mc_name];
-        note = entry.note || '';
-      }
+      players = entry.players || [];
+      note = entry.note || '';
+      strafeType = entry.strafe_type || '';
       
       // Spieler auswählen
       players.forEach(playerName => {
@@ -370,6 +421,12 @@ async function openPlayerModal(date, dayElement) {
         }
       });
       
+      // Strafe auswählen
+      if (strafeSelect) {
+        strafeSelect.value = strafeType || '';
+        updateStrafeAmount();
+      }
+      
       // Notiz eintragen
       if (noteInput) {
         noteInput.value = note || '';
@@ -378,17 +435,25 @@ async function openPlayerModal(date, dayElement) {
       // Ausgewählte Spieler anzeigen
       updateSelectedPlayersList();
     } else {
-      // Notiz leeren
+      // Felder leeren
       if (noteInput) {
         noteInput.value = '';
       }
+      if (strafeSelect) {
+        strafeSelect.value = '';
+      }
+      updateStrafeAmount();
       selectedPlayersList.innerHTML = '<p class="no-players-selected">Noch keine Spieler ausgewählt</p>';
     }
   } catch (error) {
-    // Kein Eintrag gefunden - Notiz leeren
+    // Kein Eintrag gefunden - Felder leeren
     if (noteInput) {
       noteInput.value = '';
     }
+    if (strafeSelect) {
+      strafeSelect.value = '';
+    }
+    updateStrafeAmount();
     selectedPlayersList.innerHTML = '<p class="no-players-selected">Noch keine Spieler ausgewählt</p>';
   }
   
@@ -450,6 +515,20 @@ function removePlayerFromSelection(playerId, playerName) {
   updateSelectedPlayersList();
 }
 
+function updateStrafeAmount() {
+  const strafeSelect = document.getElementById('strafeSelect');
+  const strafeAmountDisplay = document.getElementById('strafeAmountDisplay');
+  const strafeAmount = document.getElementById('strafeAmount');
+  
+  if (strafeSelect.value && STRAFEN[strafeSelect.value]) {
+    strafeAmountDisplay.style.display = 'block';
+    strafeAmount.textContent = STRAFEN[strafeSelect.value].amount;
+  } else {
+    strafeAmountDisplay.style.display = 'none';
+    strafeAmount.textContent = '0';
+  }
+}
+
 function closePlayerModal() {
   document.getElementById('playerModal').style.display = 'none';
   SELECTED_DATE = null;
@@ -475,8 +554,11 @@ function setupEventListeners() {
   document.getElementById('closeModal').addEventListener('click', closePlayerModal);
   document.getElementById('cancelModal').addEventListener('click', closePlayerModal);
   
+  // Strafen-Auswahl
+  document.getElementById('strafeSelect').addEventListener('change', updateStrafeAmount);
+  
   // Speichern-Button
-  document.getElementById('savePlayers').addEventListener('click', savePlayersToCalendar);
+  document.getElementById('savePlayers').addEventListener('click', saveStrafeToCalendar);
   
   // Entfernen-Button
   document.getElementById('removePlayer').addEventListener('click', removePlayersFromCalendar);
@@ -497,9 +579,9 @@ function setupEventListeners() {
 }
 
 // =========================
-// KALENDER DATENBANK OPERATIONEN
+// STRAFKATALOG DATENBANK OPERATIONEN
 // =========================
-async function savePlayersToCalendar() {
+async function saveStrafeToCalendar() {
   if (!SELECTED_DATE) {
     alert('Kein Datum ausgewählt!');
     return;
@@ -513,7 +595,10 @@ async function savePlayersToCalendar() {
   try {
     const dateString = formatDateForDB(SELECTED_DATE);
     const noteInput = document.getElementById('dayNote');
+    const strafeSelect = document.getElementById('strafeSelect');
     const note = noteInput ? noteInput.value.trim() : '';
+    const strafeType = strafeSelect ? strafeSelect.value : '';
+    const strafeAmount = strafeType && STRAFEN[strafeType] ? STRAFEN[strafeType].amount : 0;
     
     // Spieler-Informationen sammeln
     const playerNames = Array.from(SELECTED_PLAYERS).map(id => {
@@ -521,15 +606,9 @@ async function savePlayersToCalendar() {
       return profile ? profile.mc_name : '';
     }).filter(name => name);
     
-    // JSON-Format für Note erstellen
-    const noteData = {
-      players: playerNames,
-      text: note
-    };
-    
     // Prüfen ob bereits ein Eintrag existiert
     const { data: existing } = await window.supabaseClient
-      .from("kalender_eintraege")
+      .from("strafkatalog_eintraege")
       .select("id")
       .eq("date", dateString)
       .single();
@@ -537,27 +616,38 @@ async function savePlayersToCalendar() {
     if (existing) {
       // Bestehenden Eintrag aktualisieren
       await window.supabaseClient
-        .from("kalender_eintraege")
+        .from("strafkatalog_eintraege")
         .update({ 
-          mc_name: playerNames[0] || '', // Erster Spieler für mc_name (Kompatibilität)
-          note: JSON.stringify(noteData)
+          players: playerNames,
+          note: note,
+          strafe_type: strafeType,
+          strafe_amount: strafeAmount,
+          updated_by: CURRENT_USER_ID
         })
         .eq("date", dateString);
     } else {
       // Neuen Eintrag erstellen
       await window.supabaseClient
-        .from("kalender_eintraege")
+        .from("strafkatalog_eintraege")
         .insert([{ 
           date: dateString, 
-          mc_name: playerNames[0] || '', // Erster Spieler für mc_name
-          note: JSON.stringify(noteData),
+          players: playerNames,
+          note: note,
+          strafe_type: strafeType,
+          strafe_amount: strafeAmount,
           created_by: CURRENT_USER_ID
         }]);
     }
     
     // Benachrichtigung
     if (window.showTeamNotification) {
-      const message = `${playerNames.length} Spieler für ${formatDateDisplay(SELECTED_DATE)} eingetragen${note ? ' (mit Notiz)' : ''}`;
+      let message = `${playerNames.length} Spieler für ${formatDateDisplay(SELECTED_DATE)} eingetragen`;
+      if (strafeType && STRAFEN[strafeType]) {
+        message += ` (${STRAFEN[strafeType].name} - $${strafeAmount})`;
+      }
+      if (note) {
+        message += ' (mit Notiz)';
+      }
       
       window.showTeamNotification(
         CURRENT_MC_NAME,
@@ -589,90 +679,39 @@ async function removePlayersFromCalendar() {
   try {
     const dateString = formatDateForDB(SELECTED_DATE);
     
-    console.log('🗑️ SPIELER ENTFERNEN GESTARTET:', {
-      dateString,
-      selectedPlayerIds: Array.from(SELECTED_PLAYERS)
-    });
-    
     // Aktuelle Einträge holen
     const { data: existing } = await window.supabaseClient
-      .from("kalender_eintraege")
-      .select("note")
+      .from("strafkatalog_eintraege")
+      .select("players, note, strafe_type, strafe_amount")
       .eq("date", dateString)
       .single();
     
-    console.log('📋 AKTUELLE EINTRÄGE:', existing);
-    
-    if (existing && existing.note) {
-      let currentPlayers = [];
-      let currentNote = '';
-      
-      try {
-        const noteData = JSON.parse(existing.note);
-        currentPlayers = noteData.players || [];
-        currentNote = noteData.text || '';
-        
-        console.log('📝 GEFUNDENE SPIELER:', currentPlayers);
-      } catch (e) {
-        // Altes Format - nicht unterstützt
-        alert('Entfernen von Spielern wird nur bei neuen Einträgen unterstützt.');
-        return;
-      }
-      
-      // Verbleibende Spieler berechnen
+    if (existing && existing.players) {
+      const currentPlayers = existing.players || [];
       const selectedPlayerNames = Array.from(SELECTED_PLAYERS).map(id => {
         const profile = ALL_PROFILES.find(p => p.id === id);
         return profile ? profile.mc_name : '';
       }).filter(name => name);
       
-      console.log('🎯 AUSGEWÄHLTE SPIELER:', selectedPlayerNames);
-      
       const remainingPlayerNames = currentPlayers.filter(name => 
         !selectedPlayerNames.includes(name)
       );
       
-      console.log('✅ VERBLEIBENDE SPIELER:', remainingPlayerNames);
-      
       if (remainingPlayerNames.length > 0) {
         // Eintrag mit verbleibenden Spielern aktualisieren
-        const updatedNoteData = {
-          players: remainingPlayerNames,
-          text: currentNote
-        };
-        
-        console.log('🔄 AKTUALISIERE EINTRAG:', updatedNoteData);
-        
-        const { error: updateError } = await window.supabaseClient
-          .from("kalender_eintraege")
+        await window.supabaseClient
+          .from("strafkatalog_eintraege")
           .update({
-            mc_name: remainingPlayerNames[0], // Erster Spieler für Kompatibilität
-            note: JSON.stringify(updatedNoteData)
+            players: remainingPlayerNames,
+            updated_by: CURRENT_USER_ID
           })
           .eq("date", dateString);
-          
-        if (updateError) {
-          console.error('❌ FEHLER BEIM UPDATE:', updateError);
-          alert('Fehler beim Aktualisieren: ' + updateError.message);
-          return;
-        }
-        
-        console.log('✅ EINTRAG ERFOLGREICH AKTUALISIERT');
       } else {
         // Kompletten Eintrag löschen
-        console.log('🗑️ LÖSCHE KOMPLETTEN EINTRAG');
-        
-        const { error: deleteError } = await window.supabaseClient
-          .from("kalender_eintraege")
+        await window.supabaseClient
+          .from("strafkatalog_eintraege")
           .delete()
           .eq("date", dateString);
-          
-        if (deleteError) {
-          console.error('❌ FEHLER BEIM LÖSCHEN:', deleteError);
-          alert('Fehler beim Löschen: ' + deleteError.message);
-          return;
-        }
-        
-        console.log('✅ EINTRAG ERFOLGREICH GELÖSCHT');
       }
       
       // Benachrichtigung
@@ -687,15 +726,10 @@ async function removePlayersFromCalendar() {
       
       closePlayerModal();
       renderKalender();
-      
-      console.log('🔄 UI AKTUALISIERT');
-      
-    } else {
-      console.log('⚠️ KEINE EINTRÄGE FÜR DATUM GEFUNDEN');
     }
     
   } catch (error) {
-    console.error('❌ UNERWARTETER FEHLER BEIM ENTFERNEN:', error);
+    console.error('Fehler beim Entfernen:', error);
     alert('Fehler beim Entfernen: ' + error.message);
   }
 }

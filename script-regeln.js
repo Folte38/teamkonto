@@ -1,4 +1,61 @@
 // =========================
+// LOGIN CHECK & SEITEN-WECHSEL
+// =========================
+document.addEventListener("DOMContentLoaded", function() {
+  window.supabaseClient.auth.getSession().then(({ data }) => {
+    if (!data.session) {
+      // Nicht eingeloggt - zeige Login-Seite
+      document.getElementById('loginPage').style.display = 'flex';
+      document.getElementById('mainContent').style.display = 'none';
+    } else {
+      // Eingeloggt - zeige Inhalt
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      initializeApp();
+      initializeServerStatus();
+    }
+  });
+});
+
+// =========================
+// APP INITIALISIERUNG
+// =========================
+function initializeApp() {
+  loadProfile().then(() => {
+    loadRegeln();
+    setupEventListeners();
+  });
+}
+
+// =========================
+// PROFIL & NAV
+// =========================
+async function loadProfile() {
+  const { data: { user } } = await window.supabaseClient.auth.getUser();
+  if (!user) return Promise.resolve();
+
+  const { data: profile, error } = await window.supabaseClient
+    .from("profiles")
+    .select("mc_name, role")
+    .eq("id", user.id)
+    .single();
+
+  if (error || !profile) return Promise.resolve();
+
+  IS_ADMIN = profile.role === "admin";
+  CURRENT_USER_ID = user.id;
+  CURRENT_MC_NAME = profile.mc_name;
+
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
+  if (navUser) navUser.style.display = "flex";
+  if (navUsername) navUsername.textContent = profile.mc_name;
+  if (navAvatar) navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+}
+
+// =========================
 // GLOBALE VARIABLEN
 // =========================
 let CURRENT_USER_ID = null;
@@ -58,41 +115,32 @@ function updateServerDisplay(status, playerCount) {
 }
 
 // =========================
-// PROFIL & AUTHENTIFIZIERUNG
+// EVENT LISTENER SETUP
 // =========================
-async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
-
-  CURRENT_USER_ID = user.id;
-
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) return;
-
-  CURRENT_MC_NAME = profile.mc_name;
-  IS_ADMIN = profile.role === "admin";
-
-  const navUser = document.getElementById("navUser");
-  if (navUser) {
-    document.getElementById("navUsername").innerText = profile.mc_name;
-    document.getElementById("navAvatar").src =
-      `https://mc-heads.net/avatar/${profile.mc_name}/64`;
-    navUser.style.display = "flex";
-  }
-
-  // Admin-Button nur für Admins anzeigen
-  const editBtn = document.getElementById("editRulesBtn");
+function setupEventListeners() {
+  // Edit Button
+  const editBtn = document.getElementById("editRegelnBtn");
   if (editBtn) {
-    editBtn.style.display = IS_ADMIN ? "block" : "none";
+    editBtn.addEventListener("click", () => {
+      if (IS_ADMIN) {
+        showEditModal();
+      } else {
+        showNotification("Nur Admins können das Regelwerk bearbeiten", "error");
+      }
+    });
   }
-
-  // Regeln laden
-  loadRegeln();
+  
+  // Save Button
+  const saveBtn = document.getElementById("saveRegeln");
+  if (saveBtn) {
+    saveBtn.addEventListener("click", saveRegeln);
+  }
+  
+  // Cancel Button
+  const cancelBtn = document.getElementById("cancelEdit");
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", hideEditModal);
+  }
 }
 
 // =========================
