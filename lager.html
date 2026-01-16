@@ -37,10 +37,10 @@
 
   <div class="nav-links">
     <a href="index.html">Startseite</a>
-    <a href="items.html">Items</a>
-    <a href="kredite.html">Kredit</a>
+    <a href="items.html">Inventar</a>
     <a href="lager.html" class="active">Lager</a>
     <a href="kalender.html">Kalender</a>
+    <a href="kredite.html">Kredit</a>
     <a href="strafkatalog.html">Strafkatalog</a>
     <a href="regeln.html">Regelwerk</a>
   </div>
@@ -82,7 +82,23 @@
     <button class="clear-filters-btn" id="clearLagerFiltersBtn">Filter löschen</button>
   </div>
 
-  <div id="lagerItems"></div>
+  <!-- LAGER-INHALT MIT STATISTIK -->
+  <div class="lager-content-wrapper">
+    <!-- LINKE SEITE: LAGER ITEMS -->
+    <div class="lager-main-content">
+      <div id="lagerItems"></div>
+    </div>
+    
+    <!-- RECHTE SEITE: STATISTIK -->
+    <div class="lager-statistics">
+      <div class="statistics-header">
+        <h3>📊 Lager-Statistik</h3>
+      </div>
+      <div class="statistics-content" id="lagerStatistics">
+        <!-- Statistik wird per JavaScript geladen -->
+      </div>
+    </div>
+  </div>
 </div>
 
 </div><!-- Ende von mainContent -->
@@ -98,8 +114,27 @@
     <div class="modal-body">
       <form id="addLagerItemForm">
         <div class="form-group">
-          <label for="lagerItemName">Item Name:</label>
-          <input type="text" id="lagerItemName" placeholder="z.B. Diamant-Block" required>
+          <label for="lagerItemSelect">Item auswählen:</label>
+          <select id="lagerItemSelect" class="lager-item-select" required>
+            <option value="">-- Bitte wähle ein Item --</option>
+          </select>
+        </div>
+        
+        <div class="form-group" id="customItemGroup" style="display: none;">
+          <label for="lagerItemName">Eigenes Item:</label>
+          <input type="text" id="lagerItemName" placeholder="z.B. Diamant-Block">
+        </div>
+        
+        <div class="form-group">
+          <label for="lagerItemQuantity">Anzahl:</label>
+          <div class="quantity-input-group">
+            <input type="number" id="lagerItemQuantity" class="lager-quantity-input" 
+                   placeholder="1" min="1" max="999999" value="1">
+            <div class="quantity-info">
+              <small id="quantityInfo">1 Stück = 1 Stück</small>
+              <small id="stackInfo">Stacks: 0 × 64</small>
+            </div>
+          </div>
         </div>
         
         <div class="form-group">

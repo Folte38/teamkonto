@@ -40,13 +40,13 @@
   </div>
 
   <div class="nav-links">
-    <a href="index.html" class="nav-link">Startseite</a>
-    <a href="items.html" class="nav-link">Items</a>
-    <a href="kredite.html" class="nav-link">Kredite</a>
-    <a href="lager.html" class="nav-link">Lager</a>
-    <a href="kalender.html" class="nav-link">Kalender</a>
-    <a href="strafkatalog.html" class="nav-link active">Strafkatalog</a>
-    <a href="regeln.html" class="nav-link">Regelwerk</a>
+    <a href="index.html">Startseite</a>
+    <a href="items.html">Inventar</a>
+    <a href="lager.html">Lager</a>
+    <a href="kalender.html">Kalender</a>
+    <a href="kredite.html">Kredit</a>
+    <a href="strafkatalog.html" class="active">Strafkatalog</a>
+    <a href="regeln.html">Regelwerk</a>
   </div>
 
   <div class="nav-server-status" id="navServerStatus">
@@ -131,28 +131,11 @@
           </div>
         </div>
         
-        <div class="strafe-section">
-          <label for="strafeSelect" class="strafe-label">⚖️ Strafe (optional):</label>
-          <select id="strafeSelect" class="strafe-input">
-            <option value="">Keine Strafe ausgewählt</option>
-            <option value="griefing" data-amount="50">Griefing - $50</option>
-            <option value="spam" data-amount="20">Spam - $20</option>
-            <option value="beleidigung" data-amount="30">Beleidigung - $30</option>
-            <option value="cheating" data-amount="100">Cheating - $100</option>
-            <option value="regeln_verletzung" data-amount="25">Regelverletzung - $25</option>
-            <option value="bugusing" data-amount="40">Bugusing - $40</option>
-            <option value="teamkill" data-amount="35">Teamkill - $35</option>
-            <option value="diebstahl" data-amount="60">Diebstahl - $60</option>
-          </select>
-          
-          <div class="strafe-amount-display" id="strafeAmountDisplay" style="display: none;">
-            <strong>Strafsumme: $<span id="strafeAmount">0</span></strong>
+        <div class="strafen-section">
+          <h4>⚖️ Einzelne Strafen pro Spieler:</h4>
+          <div class="strafen-list" id="strafenList">
+            <!-- Strafen für jeden Spieler werden hier dynamisch hinzugefügt -->
           </div>
-        </div>
-        
-        <div class="note-section">
-          <label for="dayNote" class="note-label">📝 Notiz (optional):</label>
-          <textarea id="dayNote" class="note-input" placeholder="Notiz für diesen Tag eintragen..." rows="3"></textarea>
         </div>
         
         <div class="modal-actions">

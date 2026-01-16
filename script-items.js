@@ -11,6 +11,13 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('mainContent').style.display = 'block';
       initializeApp();
       initializeServerStatus();
+      
+      // Login-Benachrichtigung prüfen (einmalig pro Session)
+      if (window.checkAndSendLoginNotification) {
+        setTimeout(() => {
+          window.checkAndSendLoginNotification();
+        }, 1000);
+      }
     }
   });
 });

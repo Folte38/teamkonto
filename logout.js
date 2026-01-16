@@ -12,7 +12,7 @@ async function logout() {
     if (window.sendGlobalLogoutNotification) {
       await window.sendGlobalLogoutNotification();
       // Kurz warten, damit die Benachrichtigung gesendet werden kann
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
     const { error } = await window.supabaseClient.auth.signOut();

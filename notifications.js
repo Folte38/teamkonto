@@ -315,6 +315,59 @@ async function sendLoginNotification() {
   }
 }
 
+// =========================
+// LOGIN-SESSION VERWALTUNG
+// =========================
+let loginNotificationSent = false;
+let currentSessionId = null;
+let sessionInitialized = false;
+
+// Session-ID generieren
+function generateSessionId() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2);
+}
+
+// Login-Status prüfen und einmalige Benachrichtigung senden
+async function checkAndSendLoginNotification() {
+  if (!window.supabaseClient) return;
+  
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    if (!user) {
+      loginNotificationSent = false;
+      currentSessionId = null;
+      sessionInitialized = false;
+      return;
+    }
+
+    const { data: profile } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name")
+      .eq("id", user.id)
+      .single();
+
+    if (!profile) return;
+
+    // Prüfen ob dies eine neue Session ist
+    const newSessionId = generateSessionId();
+    if (!currentSessionId || currentSessionId !== newSessionId) {
+      currentSessionId = newSessionId;
+      loginNotificationSent = false;
+      sessionInitialized = false;
+    }
+
+    // Nur senden wenn noch nicht gesendet in dieser Session UND Session noch nicht initialisiert
+    if (!loginNotificationSent && !sessionInitialized) {
+      console.log('Sende einmalige Login-Benachrichtigung für:', profile.mc_name);
+      await sendGlobalLoginNotification();
+      loginNotificationSent = true;
+      sessionInitialized = true; // Session als initialisiert markieren
+    }
+  } catch (error) {
+    console.error('Fehler beim Prüfen des Login-Status:', error);
+  }
+}
+
 // Initialisierung beim Laden - warten bis Supabase bereit ist
 function initializeNotifications() {
   // Prüfen ob Supabase Client verfügbar ist
@@ -329,9 +382,9 @@ function initializeNotifications() {
   setupRealtimeNotifications();
   setupGlobalLoginNotifications();
   
-  // Login-Benachrichtigung nach Verzögerung senden
+  // Login-Status prüfen und einmalige Benachrichtigung senden
   setTimeout(() => {
-    sendGlobalLoginNotification();
+    checkAndSendLoginNotification();
   }, 2000);
 }
 
@@ -534,6 +587,11 @@ async function sendGlobalLogoutNotification() {
             payload: { mc_name: profile.mc_name, user_id: user.id }
           });
           console.log('✅ Logout-Benachrichtigung gesendet:', profile.mc_name);
+          
+          // Session vollständig zurücksetzen für nächsten Login
+          loginNotificationSent = false;
+          currentSessionId = null;
+          sessionInitialized = false;
         } catch (error) {
           console.error('Fehler beim Senden der Logout-Benachrichtigung:', error);
         }
@@ -556,6 +614,7 @@ window.loadCurrentUser = loadCurrentUser;
 window.setupGlobalLoginNotifications = setupGlobalLoginNotifications;
 window.sendGlobalLoginNotification = sendGlobalLoginNotification;
 window.sendGlobalLogoutNotification = sendGlobalLogoutNotification;
+window.checkAndSendLoginNotification = checkAndSendLoginNotification;
 
 // Cleanup beim Verlassen der Seite
 window.addEventListener('beforeunload', () => {

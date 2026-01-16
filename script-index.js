@@ -11,6 +11,13 @@ window.supabaseClient.auth.getSession().then(({ data }) => {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
     initializeApp();
+    
+    // Login-Benachrichtigung prüfen (einmalig pro Session)
+    if (window.checkAndSendLoginNotification) {
+      setTimeout(() => {
+        window.checkAndSendLoginNotification();
+      }, 1000);
+    }
   }
   // Wenn nicht eingeloggt, bleibt der Benutzer auf der Login-Seite
 });

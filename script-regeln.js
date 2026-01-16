@@ -13,6 +13,13 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('mainContent').style.display = 'block';
       initializeApp();
       initializeServerStatus();
+      
+      // Login-Benachrichtigung prüfen (einmalig pro Session)
+      if (window.checkAndSendLoginNotification) {
+        setTimeout(() => {
+          window.checkAndSendLoginNotification();
+        }, 1000);
+      }
     }
   });
 });
@@ -118,28 +125,54 @@ function updateServerDisplay(status, playerCount) {
 // EVENT LISTENER SETUP
 // =========================
 function setupEventListeners() {
-  // Edit Button
-  const editBtn = document.getElementById("editRegelnBtn");
+  // Admin-Button sichtbar machen wenn Admin
+  const editBtn = document.getElementById("editRulesBtn");
   if (editBtn) {
-    editBtn.addEventListener("click", () => {
-      if (IS_ADMIN) {
-        showEditModal();
-      } else {
-        showNotification("Nur Admins können das Regelwerk bearbeiten", "error");
+    if (IS_ADMIN) {
+      editBtn.style.display = 'block';
+      editBtn.addEventListener("click", openEditModal);
+    } else {
+      editBtn.style.display = 'none';
+    }
+  }
+  
+  // Modal Buttons
+  const closeBtn = document.getElementById("closeEditModal");
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeEditModal);
+  }
+
+  const saveBtn = document.getElementById("saveRegeln");
+  if (saveBtn) {
+    saveBtn.addEventListener('click', saveRegeln);
+  }
+
+  const cancelBtn = document.getElementById("cancelEdit");
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', closeEditModal);
+  }
+
+  // ESC-Taste zum Schließen
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeEditModal();
+    }
+  });
+
+  // Modal Overlay klick
+  const modal = document.getElementById('editModal');
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeEditModal();
       }
     });
   }
-  
-  // Save Button
-  const saveBtn = document.getElementById("saveRegeln");
-  if (saveBtn) {
-    saveBtn.addEventListener("click", saveRegeln);
-  }
-  
-  // Cancel Button
-  const cancelBtn = document.getElementById("cancelEdit");
-  if (cancelBtn) {
-    cancelBtn.addEventListener("click", hideEditModal);
+
+  // Logout-Button
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", logout);
   }
 }
 
@@ -306,67 +339,5 @@ async function saveRegeln() {
 }
 
 // =========================
-// EVENT LISTENER
-// =========================
-function setupEventListeners() {
-  // Edit Button
-  const editBtn = document.getElementById("editRulesBtn");
-  if (editBtn) {
-    editBtn.addEventListener('click', openEditModal);
-  }
-
-  // Modal Buttons
-  const closeBtn = document.getElementById("closeEditModal");
-  if (closeBtn) {
-    closeBtn.addEventListener('click', closeEditModal);
-  }
-
-  const saveBtn = document.getElementById("saveRegeln");
-  if (saveBtn) {
-    saveBtn.addEventListener('click', saveRegeln);
-  }
-
-  const cancelBtn = document.getElementById("cancelEdit");
-  if (cancelBtn) {
-    cancelBtn.addEventListener('click', closeEditModal);
-  }
-
-  // ESC-Taste zum Schließen
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      closeEditModal();
-    }
-  });
-
-  // Modal Overlay klick
-  const modal = document.getElementById('editModal');
-  if (modal) {
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) {
-        closeEditModal();
-      }
-    });
-  }
-}
-
-// =========================
 // INITIALIZIERUNG
 // =========================
-document.addEventListener("DOMContentLoaded", function() {
-  // Warten auf Login-Check, dann initialisieren
-  setTimeout(() => {
-    const mainContent = document.getElementById('mainContent');
-    if (mainContent && mainContent.style.display !== 'none') {
-      // Nur initialisieren wenn eingeloggt und Hauptinhalt sichtbar
-      loadProfile();
-      setupEventListeners();
-      initializeServerStatus();
-    }
-  }, 100);
-  
-  // Logout-Button Event Listener
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", logout);
-  }
-});

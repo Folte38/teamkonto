@@ -160,7 +160,7 @@ async function loadLagerItems() {
 
   let { data: items } = await window.supabaseClient
     .from("team_lager_items")
-    .select("id, name, added_by, created_at")
+    .select("id, name, quantity, added_by, created_at")
     .order("created_at", { ascending: false });
 
   // Filter anwenden
@@ -196,9 +196,18 @@ async function loadLagerItems() {
     
     const isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
     
+    // Stack-Berechnung
+    const stacks = Math.floor(item.quantity / 64);
+    const remainder = item.quantity % 64;
+    
     itemElement.innerHTML = `
       <button class="remove-lager-item-btn" title="Item entfernen">×</button>
       <div class="lager-item-name ${isHighlighted ? 'item-highlight' : ''}">${item.name}</div>
+      <div class="lager-item-quantity">
+        <span class="quantity-badge">${item.quantity.toLocaleString()} Stück</span>
+        ${stacks > 0 ? `<span class="stack-badge">${stacks} × 64</span>` : ''}
+        ${remainder > 0 ? `<span class="remainder-badge">+${remainder}</span>` : ''}
+      </div>
       <div class="lager-item-meta">
         <img src="https://mc-heads.net/avatar/${item.added_by}/24" 
              alt="${item.added_by}" 
@@ -214,6 +223,108 @@ async function loadLagerItems() {
   });
 
   container.appendChild(itemsGrid);
+  
+  // Statistik aktualisieren
+  updateLagerStatistics(items);
+}
+
+// =========================
+// LAGER STATISTIK AKTUALISIEREN
+// =========================
+async function updateLagerStatistics(items) {
+  const statisticsContainer = document.getElementById('lagerStatistics');
+  if (!statisticsContainer) return;
+
+  // Item-Kategorien für die Statistik
+  const itemCategories = {
+    'Erze': ['Diamant', 'Gold', 'Eisen', 'Kohle', 'Kupfer', 'Lapislazuli', 'Redstone', 'Smaragd', 'Netherit', 'Quarz'],
+    'Blöcke': ['Block', 'Holz', 'Stein', 'Erde', 'Sand', 'Kies', 'Glas', 'Beton', 'Wolle', 'Terra'],
+    'Werkzeuge': ['Axt', 'Spitzhacke', 'Schaufel', 'Hacke', 'Schwert', 'Bogen', 'Armbrust'],
+    'Rüstung': ['Helm', 'Brustpanzer', 'Hose', 'Stiefel', 'Rüstung'],
+    'Nahrung': ['Brot', 'Apfel', 'Karotte', 'Kartoffel', 'Fleisch', 'Fisch', 'Kuchen'],
+    'Tränke': ['Trank', 'Potion'],
+    'Sonstiges': []
+  };
+
+  // Items nach Kategorien zählen und summieren
+  const categoryCounts = {};
+  const categoryQuantities = {};
+  const uncategorizedItems = [];
+
+  items.forEach(item => {
+    let categorized = false;
+    
+    for (const [category, keywords] of Object.entries(itemCategories)) {
+      if (category === 'Sonstiges') continue;
+      
+      if (keywords.some(keyword => item.name.toLowerCase().includes(keyword.toLowerCase()))) {
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+        categoryQuantities[category] = (categoryQuantities[category] || 0) + item.quantity;
+        categorized = true;
+        break;
+      }
+    }
+    
+    if (!categorized) {
+      uncategorizedItems.push(item);
+      categoryQuantities['Sonstiges'] = (categoryQuantities['Sonstiges'] || 0) + item.quantity;
+    }
+  });
+
+  if (uncategorizedItems.length > 0) {
+    categoryCounts['Sonstiges'] = uncategorizedItems.length;
+  }
+
+  // Gesamtmenge berechnen
+  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Statistik-HTML erstellen
+  let statisticsHTML = '<div class="statistics-grid">';
+  
+  for (const [category, count] of Object.entries(categoryCounts)) {
+    const quantity = categoryQuantities[category] || 0;
+    const percentage = totalQuantity > 0 ? Math.round((quantity / totalQuantity) * 100) : 0;
+    const stacks = Math.floor(quantity / 64);
+    
+    statisticsHTML += `
+      <div class="stat-item">
+        <div class="stat-category">${category}</div>
+        <div class="stat-count">${quantity.toLocaleString()} Stück</div>
+        <div class="stat-stacks">${stacks} × 64 Stacks</div>
+        <div class="stat-percentage">${percentage}%</div>
+        <div class="stat-bar">
+          <div class="stat-bar-fill" style="width: ${percentage}%"></div>
+        </div>
+      </div>
+    `;
+  }
+  
+  statisticsHTML += '</div>';
+  
+  // Gesamtstatistik hinzufügen
+  const totalStacks = Math.floor(totalQuantity / 64);
+  statisticsHTML += `
+    <div class="total-statistics">
+      <div class="total-item">
+        <span class="total-label">Gesamtanzahl Items:</span>
+        <span class="total-value">${items.length}</span>
+      </div>
+      <div class="total-item">
+        <span class="total-label">Gesamtmenge:</span>
+        <span class="total-value">${totalQuantity.toLocaleString()} Stück</span>
+      </div>
+      <div class="total-item">
+        <span class="total-label">Gesamtstacks:</span>
+        <span class="total-value">${totalStacks} × 64</span>
+      </div>
+      <div class="total-item">
+        <span class="total-label">Kategorien:</span>
+        <span class="total-value">${Object.keys(categoryCounts).length}</span>
+      </div>
+    </div>
+  `;
+
+  statisticsContainer.innerHTML = statisticsHTML;
 }
 
 // =========================
@@ -222,10 +333,34 @@ async function loadLagerItems() {
 async function addLagerItem(event) {
   event.preventDefault();
   
-  const itemName = document.getElementById('lagerItemName').value.trim();
+  const itemSelect = document.getElementById('lagerItemSelect');
+  const customItemName = document.getElementById('lagerItemName').value.trim();
+  const quantityInput = document.getElementById('lagerItemQuantity');
+  
+  let itemName = '';
+  
+  // Prüfen ob Dropdown oder Custom-Input verwendet wird
+  if (itemSelect.value === 'custom') {
+    itemName = customItemName;
+  } else {
+    itemName = itemSelect.value;
+  }
+  
+  // Anzahl berechnen
+  let quantity = parseInt(quantityInput.value) || 1;
+  
+  // Wenn Anzahl 1 ist, automatisch auf 64 setzen (für Blöcke/Items)
+  if (quantity === 1) {
+    quantity = 64;
+  }
   
   if (!itemName) {
-    showMessage('Bitte gib einen Item-Namen ein.', 'error');
+    showMessage('Bitte wähle ein Item aus oder gib ein eigenes Item ein.', 'error');
+    return;
+  }
+  
+  if (quantity < 1 || quantity > 999999) {
+    showMessage('Bitte gib eine gültige Anzahl zwischen 1 und 999.999 ein.', 'error');
     return;
   }
   
@@ -233,34 +368,77 @@ async function addLagerItem(event) {
     const timestamp = Date.now();
     const uniqueKey = `lager_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Debug-Informationen ausgeben
+    console.log('Versuche Item hinzuzufügen:', {
+      key: uniqueKey,
+      name: itemName,
+      quantity: quantity,
+      added_by: CURRENT_MC_NAME,
+      user_id: CURRENT_USER_ID
+    });
+    
     const { data, error } = await window.supabaseClient
       .from('team_lager_items')
       .insert([
         {
           key: uniqueKey,
           name: itemName,
+          quantity: quantity,
           added_by: CURRENT_MC_NAME
         }
       ]);
     
     if (error) {
       console.error('Fehler beim Hinzufügen des Lager-Items:', error);
-      showMessage('Fehler beim Hinzufügen des Items: ' + error.message, 'error');
+      console.error('Fehler-Details:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      
+      // Spezifische Fehlermeldungen
+      if (error.message.includes('row-level security')) {
+        showMessage('Fehler: Keine Berechtigung zum Hinzufügen von Items. Bitte kontaktiere einen Admin.', 'error');
+      } else if (error.message.includes('duplicate key')) {
+        showMessage('Fehler: Dieses Item existiert bereits.', 'error');
+      } else {
+        showMessage('Fehler beim Hinzufügen des Items: ' + error.message, 'error');
+      }
       return;
     }
     
-    showMessage(`Item "${itemName}" wurde erfolgreich zum Lager hinzugefügt!`, 'success');
+    console.log('Item erfolgreich hinzugefügt:', data);
+    
+    // Stack-Informationen für die Nachricht
+    const stacks = Math.floor(quantity / 64);
+    const remainder = quantity % 64;
+    let quantityText = `${quantity.toLocaleString()} Stück`;
+    if (stacks > 0) {
+      quantityText += ` (${stacks} × 64`;
+      if (remainder > 0) {
+        quantityText += ` + ${remainder}`;
+      }
+      quantityText += ')';
+    }
+    
+    showMessage(`Item "${itemName}" mit ${quantityText} wurde erfolgreich zum Lager hinzugefügt!`, 'success');
     
     // Notification für andere
     if (window.showTeamNotification && CURRENT_MC_NAME) {
       window.showTeamNotification(
         CURRENT_MC_NAME, 
-        `${CURRENT_MC_NAME} hat ${itemName} zum Lager hinzugefügt`, 
+        `${CURRENT_MC_NAME} hat ${itemName} (${quantityText}) zum Lager hinzugefügt`, 
         'info'
       );
     }
     
+    // Formular zurücksetzen
+    itemSelect.value = '';
+    document.getElementById('customItemGroup').style.display = 'none';
     document.getElementById('lagerItemName').value = '';
+    quantityInput.value = '1';
+    updateQuantityInfo(1);
     
     setTimeout(() => {
       hideAddLagerItemModal();
@@ -268,7 +446,7 @@ async function addLagerItem(event) {
     }, 1500);
     
   } catch (error) {
-    console.error('Fehler beim Hinzufügen des Lager-Items:', error);
+    console.error('Unerwarteter Fehler beim Hinzufügen des Lager-Items:', error);
     showMessage('Ein unerwarteter Fehler ist aufgetreten.', 'error');
   }
 }
@@ -308,6 +486,118 @@ function showAddLagerItemModal() {
     if (form) {
       form.reset();
     }
+    
+    // Item-Dropdown füllen
+    populateItemDropdown();
+  }
+}
+
+// =========================
+// ITEM DROPDOWN FÜLLEN
+// =========================
+function populateItemDropdown() {
+  const itemSelect = document.getElementById('lagerItemSelect');
+  if (!itemSelect) return;
+  
+  // Vordefinierte Items für Minecraft
+  const predefinedItems = [
+    // Erze
+    'Diamant', 'Goldbarren', 'Eisenbarren', 'Kohle', 'Kupferbarren', 'Lapislazuli', 'Redstone', 'Smaragd', 'Netheritbarren', 'Quarz',
+    // Blöcke
+    'Diamantblock', 'Goldblock', 'Eisenblock', 'Stein', 'Holzbretter', 'Erde', 'Sand', 'Kies', 'Glas', 'Beton', 'Wolle',
+    // Werkzeuge
+    'Diamantspitzhacke', 'Diamantaxt', 'Diamantschwert', 'Diamantschaufel', 'Goldspitzhacke', 'Eisenspitzhacke', 'Steinspitzhacke',
+    // Rüstung
+    'Diamanthelm', 'Diamantbrustpanzer', 'Diamanthose', 'Diamantstiefel', 'Goldhelm', 'Eisenhelm',
+    // Nahrung
+    'Brot', 'Apfel', 'Goldener Apfel', 'Karotte', 'Gebratene Kartoffel', 'Rohes Fleisch', 'Gebratenes Fleisch', 'Fisch', 'Kuchen',
+    // Tränke
+    'Heiltrank', 'Stärketrank', 'Geschwindigkeitstrank', 'Feuerresistenztrank',
+    // Sonstiges
+    'Enderperle', 'Leuchtstein', 'Knochenmehl', 'Pfeil', 'Bogen', 'Armbrust', 'Schild', 'Eimer', 'Sattel'
+  ];
+  
+  // Dropdown leeren und füllen
+  itemSelect.innerHTML = '<option value="">-- Bitte wähle ein Item --</option>';
+  
+  // Items nach Kategorie gruppieren
+  const categories = {
+    'Erze': ['Diamant', 'Goldbarren', 'Eisenbarren', 'Kohle', 'Kupferbarren', 'Lapislazuli', 'Redstone', 'Smaragd', 'Netheritbarren', 'Quarz'],
+    'Blöcke': ['Diamantblock', 'Goldblock', 'Eisenblock', 'Stein', 'Holzbretter', 'Erde', 'Sand', 'Kies', 'Glas', 'Beton', 'Wolle'],
+    'Werkzeuge': ['Diamantspitzhacke', 'Diamantaxt', 'Diamantschwert', 'Diamantschaufel', 'Goldspitzhacke', 'Eisenspitzhacke', 'Steinspitzhacke'],
+    'Rüstung': ['Diamanthelm', 'Diamantbrustpanzer', 'Diamanthose', 'Diamantstiefel', 'Goldhelm', 'Eisenhelm'],
+    'Nahrung': ['Brot', 'Apfel', 'Goldener Apfel', 'Karotte', 'Gebratene Kartoffel', 'Rohes Fleisch', 'Gebratenes Fleisch', 'Fisch', 'Kuchen'],
+    'Tränke': ['Heiltrank', 'Stärketrank', 'Geschwindigkeitstrank', 'Feuerresistenztrank'],
+    'Sonstiges': ['Enderperle', 'Leuchtstein', 'Knochenmehl', 'Pfeil', 'Bogen', 'Armbrust', 'Schild', 'Eimer', 'Sattel']
+  };
+  
+  // Optionen mit Optgroups erstellen
+  for (const [category, items] of Object.entries(categories)) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = category;
+    
+    items.forEach(item => {
+      const option = document.createElement('option');
+      option.value = item;
+      option.textContent = item;
+      optgroup.appendChild(option);
+    });
+    
+    itemSelect.appendChild(optgroup);
+  }
+  
+  // Option für eigenes Item hinzufügen
+  const customOption = document.createElement('option');
+  customOption.value = 'custom';
+  customOption.textContent = '➕ Eigenes Item hinzufügen';
+  itemSelect.appendChild(customOption);
+  
+  // Event Listener für Dropdown-Änderungen
+  itemSelect.addEventListener('change', handleItemSelectChange);
+}
+
+// =========================
+// ITEM SELECT CHANGE HANDLER
+// =========================
+function handleItemSelectChange(event) {
+  const select = event.target;
+  const customItemGroup = document.getElementById('customItemGroup');
+  const customItemInput = document.getElementById('lagerItemName');
+  
+  if (select.value === 'custom') {
+    customItemGroup.style.display = 'block';
+    customItemInput.required = true;
+    customItemInput.focus();
+  } else {
+    customItemGroup.style.display = 'none';
+    customItemInput.required = false;
+    customItemInput.value = '';
+  }
+}
+
+// =========================
+// QUANTITY INFO UPDATE
+// =========================
+function updateQuantityInfo(quantity) {
+  const quantityInfo = document.getElementById('quantityInfo');
+  const stackInfo = document.getElementById('stackInfo');
+  
+  if (!quantityInfo || !stackInfo) return;
+  
+  const actualQuantity = quantity === 1 ? 64 : quantity;
+  const stacks = Math.floor(actualQuantity / 64);
+  const remainder = actualQuantity % 64;
+  
+  if (quantity === 1) {
+    quantityInfo.textContent = '1 Stück = 64 Stück (Auto-Stack)';
+  } else {
+    quantityInfo.textContent = `${quantity} Stück = ${actualQuantity.toLocaleString()} Stück`;
+  }
+  
+  if (stacks > 0) {
+    stackInfo.textContent = `Stacks: ${stacks} × 64${remainder > 0 ? ` + ${remainder}` : ''}`;
+  } else {
+    stackInfo.textContent = 'Stacks: 0 × 64';
   }
 }
 
@@ -578,6 +868,19 @@ function setupEventListeners() {
       }
     });
   }
+  
+  // Quantity Input Event Listener
+  const quantityInput = document.getElementById('lagerItemQuantity');
+  if (quantityInput) {
+    quantityInput.addEventListener('input', (e) => {
+      const value = parseInt(e.target.value) || 1;
+      updateQuantityInfo(value);
+    });
+    
+    quantityInput.addEventListener('focus', () => {
+      updateQuantityInfo(parseInt(quantityInput.value) || 1);
+    });
+  }
 }
 
 // =========================
@@ -608,12 +911,121 @@ function addLagerStyles() {
     style.textContent = `
       /* Lager-seitenspezifische Styles */
       .lager-page {
-        max-width: 1200px;
+        max-width: 1400px;
         margin: 30px auto;
         padding: 30px 34px;
         background: rgba(15, 15, 15, 0.88);
         backdrop-filter: blur(10px);
         border-radius: 20px;
+      }
+
+      .lager-content-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 300px;
+        gap: 30px;
+        margin-top: 20px;
+      }
+
+      .lager-main-content {
+        min-width: 0;
+      }
+
+      .lager-statistics {
+        background: rgba(20, 20, 20, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px;
+        backdrop-filter: blur(10px);
+        height: fit-content;
+        position: sticky;
+        top: 30px;
+      }
+
+      .statistics-header {
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .statistics-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #fff;
+      }
+
+      .statistics-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 20px;
+      }
+
+      .stat-item {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 12px;
+      }
+
+      .stat-category {
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 4px;
+      }
+
+      .stat-count {
+        font-size: 16px;
+        font-weight: 700;
+        color: #4CAF50;
+        margin-bottom: 4px;
+      }
+
+      .stat-percentage {
+        font-size: 12px;
+        color: #999;
+        margin-bottom: 8px;
+      }
+
+      .stat-bar {
+        width: 100%;
+        height: 6px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .stat-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50, #45a049);
+        border-radius: 3px;
+        transition: width 0.3s ease;
+      }
+
+      .total-statistics {
+        padding-top: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .total-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .total-label {
+        font-size: 13px;
+        color: #ccc;
+      }
+
+      .total-value {
+        font-size: 14px;
+        font-weight: 600;
+        color: #fff;
       }
 
       .lager-items-grid {
@@ -739,6 +1151,113 @@ function addLagerStyles() {
         width: 32px;
         height: 32px;
         border-radius: 6px;
+      }
+
+      .lager-item-select {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(20, 20, 20, 0.9);
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .lager-item-select:focus {
+        outline: none;
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+      }
+
+      .lager-item-select option {
+        background: #1a1a1a;
+        color: #fff;
+        padding: 8px;
+      }
+
+      .lager-item-select optgroup {
+        background: #2a2a2a;
+        color: #4CAF50;
+        font-weight: 600;
+        padding: 4px 8px;
+      }
+
+      .quantity-input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .lager-quantity-input {
+        width: 100%;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        background: rgba(20, 20, 20, 0.9);
+        color: #fff;
+        font-size: 14px;
+        transition: all 0.2s ease;
+      }
+
+      .lager-quantity-input:focus {
+        outline: none;
+        border-color: #4CAF50;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+      }
+
+      .quantity-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 12px;
+        background: rgba(76, 175, 80, 0.1);
+        border: 1px solid rgba(76, 175, 80, 0.2);
+        border-radius: 6px;
+      }
+
+      .quantity-info small {
+        font-size: 12px;
+        color: #4CAF50;
+        font-weight: 500;
+      }
+
+      .lager-item-quantity {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+        padding: 8px;
+        background: rgba(76, 175, 80, 0.1);
+        border: 1px solid rgba(76, 175, 80, 0.2);
+        border-radius: 6px;
+      }
+
+      .quantity-badge {
+        font-size: 14px;
+        font-weight: 700;
+        color: #4CAF50;
+        display: block;
+      }
+
+      .stack-badge {
+        font-size: 12px;
+        color: #2196F3;
+        font-weight: 600;
+      }
+
+      .remainder-badge {
+        font-size: 11px;
+        color: #FF9800;
+        font-weight: 600;
+      }
+
+      .stat-stacks {
+        font-size: 13px;
+        color: #2196F3;
+        font-weight: 600;
+        margin-bottom: 4px;
       }
 
       /* Bestätigungs-Modal */
@@ -908,6 +1427,18 @@ function addLagerStyles() {
       }
 
       /* Responsive Design */
+      @media (max-width: 1024px) {
+        .lager-content-wrapper {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+        
+        .lager-statistics {
+          position: static;
+          order: -1;
+        }
+      }
+
       @media (max-width: 768px) {
         .lager-items-grid {
           grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -916,6 +1447,10 @@ function addLagerStyles() {
         
         .lager-item {
           padding: 12px;
+        }
+        
+        .lager-page {
+          padding: 20px;
         }
       }
     `;

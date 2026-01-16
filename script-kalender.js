@@ -13,6 +13,13 @@ document.addEventListener("DOMContentLoaded", function() {
       document.getElementById('mainContent').style.display = 'block';
       initializeApp();
       initializeServerStatus();
+      
+      // Login-Benachrichtigung prüfen (einmalig pro Session)
+      if (window.checkAndSendLoginNotification) {
+        setTimeout(() => {
+          window.checkAndSendLoginNotification();
+        }, 1000);
+      }
     }
   });
 });
@@ -77,6 +84,22 @@ function initializeApp() {
   loadPlayers();
   setupEventListeners();
   renderKalender();
+  setActiveNavLink();
+}
+
+// =========================
+// NAVIGATION AKTIV STATUS
+// =========================
+function setActiveNavLink() {
+  // Alle Nav-Links entfernen active class
+  const navLinks = document.querySelectorAll('.nav-link');
+  navLinks.forEach(link => link.classList.remove('active'));
+  
+  // Kalender-Link aktiv setzen
+  const kalenderLink = document.querySelector('.nav-link[href="kalender.html"]');
+  if (kalenderLink) {
+    kalenderLink.classList.add('active');
+  }
 }
 
 // =========================
