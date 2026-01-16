@@ -25,28 +25,34 @@ async function checkAdminAndInitialize(userId) {
       .eq("id", userId)
       .single();
 
-    if (!profile || profile.role !== "admin") {
-      // Kein Admin - zeige Fehlerseite
+    if (!profile) {
+      // Kein Profil - zeige Login-Seite
       document.getElementById('loginPage').style.display = 'flex';
       document.getElementById('mainContent').style.display = 'none';
-      
-      const loginContent = document.querySelector('.login-overlay-content');
-      loginContent.innerHTML = `
-        <img src="logo.png" alt="Logo" class="login-logo">
-        <h2>🚫 Zugriff verweigert</h2>
-        <p>Du benötigst Admin-Rechte, um auf den Strafkatalog zugreifen zu können.</p>
-        <button onclick="window.location.href='index.html'" class="login-btn">
-          Zurück zur Startseite
-        </button>
-      `;
       return;
     }
 
-    // Admin - zeige Inhalt
+    // Alle eingeloggten Benutzer können die Seite sehen
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
+    
+    // Admin-Status global speichern
+    window.IS_ADMIN = profile.role === "admin";
+    
+    // App initialisieren
     initializeApp();
     initializeServerStatus();
+    
+    // Admin-Indikator im Header anzeigen/verstecken
+    const adminIndicator = document.getElementById('adminIndicator');
+    if (adminIndicator) {
+      if (window.IS_ADMIN) {
+        adminIndicator.style.display = 'inline';
+        adminIndicator.style.color = '#4CAF50';
+      } else {
+        adminIndicator.style.display = 'none';
+      }
+    }
     
     // Login-Benachrichtigung prüfen (einmalig pro Session)
     if (window.checkAndSendLoginNotification) {
@@ -56,8 +62,8 @@ async function checkAdminAndInitialize(userId) {
     }
     
   } catch (error) {
-    console.error('Fehler bei der Admin-Prüfung:', error);
-    // Bei Fehler auch Zugriff verweigern
+    console.error('Fehler beim Prüfen der Admin-Rechte:', error);
+    // Bei Fehler - zeige Login-Seite
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'none';
   }
@@ -683,11 +689,29 @@ function setupEventListeners() {
   document.getElementById('closeModal').addEventListener('click', closePlayerModal);
   document.getElementById('cancelModal').addEventListener('click', closePlayerModal);
   
-  // Speichern-Button
-  document.getElementById('savePlayers').addEventListener('click', saveStrafenToCalendar);
+  // Speichern-Button - NUR FÜR ADMINS
+  const saveBtn = document.getElementById('savePlayers');
+  if (saveBtn) {
+    if (window.IS_ADMIN) {
+      saveBtn.addEventListener('click', saveStrafenToCalendar);
+      saveBtn.style.display = 'inline-block';
+      saveBtn.disabled = false;
+    } else {
+      saveBtn.style.display = 'none';
+    }
+  }
   
-  // Entfernen-Button
-  document.getElementById('removePlayer').addEventListener('click', removePlayersFromCalendar);
+  // Entfernen-Button - NUR FÜR ADMINS
+  const removeBtn = document.getElementById('removePlayer');
+  if (removeBtn) {
+    if (window.IS_ADMIN) {
+      removeBtn.addEventListener('click', removePlayersFromCalendar);
+      removeBtn.style.display = 'inline-block';
+      removeBtn.disabled = false;
+    } else {
+      removeBtn.style.display = 'none';
+    }
+  }
   
   // Modal schließen wenn außerhalb geklickt wird
   document.getElementById('playerModal').addEventListener('click', (e) => {
