@@ -182,12 +182,33 @@ function updatePlayerSelectionGrid(container, players, itemClass) {
     `;
     
     item.addEventListener('click', () => {
-      if (container.id === 'ownerSelectionGrid') {
+      // Visuelles Feedback für Auswahl
+      if (container.id === 'ownerSelectionGrid' || container.id === 'editOwnerSelectionGrid') {
+        // Entferne Auswahl von allen anderen Elementen im selben Container
         document.querySelectorAll(`#${container.id} .${itemClass}`).forEach(el => {
           el.classList.remove('selected');
         });
+        
+        // Füge Auswahl zum geklickten Element hinzu
         item.classList.add('selected');
+        
+        // Zeige Feedback für die Auswahl
+        const isEditModal = container.id === 'editOwnerSelectionGrid';
+        const feedbackText = isEditModal 
+          ? `Neuer Besitzer ausgewählt: ${player}` 
+          : `${player} als Besitzer ausgewählt`;
+        
+        if (isEditModal) {
+          showEditMessage(feedbackText, 'success');
+        }
+        
+        // Füge temporären Fokus zum Container hinzu
+        container.classList.add('focused');
+        setTimeout(() => {
+          container.classList.remove('focused');
+        }, 1500);
       } else {
+        // Normale Spieler-Auswahl für Single View
         document.querySelectorAll('.player-select-item').forEach(el => {
           el.classList.remove('selected');
         });
@@ -474,6 +495,11 @@ async function loadTeamItems() {
           ? `<button class="remove-item-btn admin-only" title="Item entfernen">×</button>`
           : '';
 
+        // Edit-Button für Admins
+        const editButtonHtml = IS_ADMIN 
+          ? `<button class="edit-item-btn admin-only" title="Item bearbeiten">✏️</button>`
+          : '';
+
         const itemElement = document.createElement('div');
         itemElement.className = `team-item ${isMine ? "mine" : ""} ${isHighlighted ? "item-highlight" : ""}`;
         itemElement.dataset.id = item.id;
@@ -481,6 +507,7 @@ async function loadTeamItems() {
         itemElement.dataset.owner = item.storage;
         itemElement.innerHTML = `
           ${removeButtonHtml}
+          ${editButtonHtml}
           <div class="item-name">${item.name}</div>
           ${statusHtml}
         `;
@@ -564,12 +591,18 @@ async function loadTeamItems() {
           ? `<button class="remove-item-btn admin-only" title="Item entfernen">×</button>`
           : '';
 
+        // Edit-Button für Admins
+        const editButtonHtml = IS_ADMIN 
+          ? `<button class="edit-item-btn admin-only" title="Item bearbeiten">✏️</button>`
+          : '';
+
         rowHtml += `
           <div class="team-item ${isMine ? "mine" : ""} ${isHighlighted ? "item-highlight" : ""}"
                data-id="${item.id}"
                data-name="${item.name}"
                data-owner="${player}">
             ${removeButtonHtml}
+            ${editButtonHtml}
             <div class="item-name">${item.name}</div>
             ${statusHtml}
           </div>
@@ -631,7 +664,6 @@ async function toggleItem(itemId) {
       window.showTeamNotification(CURRENT_MC_NAME, `"${itemName}" ausgeliehen`, "success");
     }
   }
-  
   // UI aktualisieren
   await loadTeamItems();
 }
@@ -658,6 +690,36 @@ function showDeleteConfirmation(itemId, itemName, playerName, isAdmin) {
       }
     }
   );
+}
+
+// =========================
+// ITEM AUS DATENBANK ENTFERNEN
+// =========================
+async function removeItemFromDatabase(itemId, itemName, playerName) {
+  try {
+    // Zuerst alle Verwendungen des Items löschen
+    await window.supabaseClient
+      .from("team_item_usage")
+      .delete()
+      .eq("item_id", itemId);
+    
+    // Dann das Item selbst löschen
+    const { error } = await window.supabaseClient
+      .from("team_items")
+      .delete()
+      .eq("id", itemId);
+    
+    if (error) {
+      console.error('Fehler beim Entfernen des Items:', error);
+      return false;
+    }
+    
+    console.log(`Item "${itemName}" von ${playerName} wurde erfolgreich entfernt`);
+    return true;
+  } catch (error) {
+    console.error('Fehler beim Entfernen des Items:', error);
+    return false;
+  }
 }
 
 // =========================
@@ -749,9 +811,25 @@ document.addEventListener("click", async (e) => {
     return;
   }
 
+  // ✏️ Item bearbeiten - Der Edit-Button
+  const editBtn = e.target.closest(".edit-item-btn");
+  if (editBtn) {
+    e.stopPropagation();
+    
+    const itemElement = editBtn.closest('.team-item');
+    const itemId = itemElement.dataset.id;
+    const itemName = itemElement.dataset.name || itemElement.querySelector('.item-name').textContent;
+    const currentOwner = itemElement.dataset.owner || 
+                        itemElement.closest('.player-row')?.querySelector('.player-name')?.textContent || 
+                        itemElement.closest('.single-player-view')?.querySelector('.single-player-name')?.textContent;
+    
+    showEditItemModal(itemId, itemName, currentOwner);
+    return;
+  }
+
   // 👆 Item nehmen / zurücklegen
   const item = e.target.closest(".team-item");
-  if (item && !e.target.closest(".remove-item-btn")) {
+  if (item && !e.target.closest(".remove-item-btn") && !e.target.closest(".edit-item-btn")) {
     toggleItem(item.dataset.id);
   }
 });
@@ -786,6 +864,80 @@ function hideAddItemModal() {
     
     const messages = modal.querySelectorAll('.message');
     messages.forEach(msg => msg.remove());
+  }
+}
+
+// =========================
+// MODAL FUNKTIONEN (Edit Item)
+// =========================
+function showEditItemModal(itemId, itemName, currentOwner) {
+  const modal = document.getElementById('editItemModal');
+  if (modal) {
+    // Setze die aktuellen Werte
+    document.getElementById('editItemId').value = itemId;
+    document.getElementById('editItemName').value = itemName;
+    
+    // Zeige das Modal
+    modal.style.display = 'flex';
+    
+    // Lade die Spieler für das Edit Modal
+    const editOwnerGrid = document.getElementById('editOwnerSelectionGrid');
+    if (editOwnerGrid) {
+      updatePlayerSelectionGrid(editOwnerGrid, ALL_PLAYERS, 'edit-owner-select-item');
+      
+      // Füge Fokus-Klasse für visuelles Feedback hinzu
+      editOwnerGrid.classList.add('focused');
+      
+      // Wähle den aktuellen Besitzer
+      setTimeout(() => {
+        const currentOwnerItem = document.querySelector(`.edit-owner-select-item[data-player="${currentOwner}"]`);
+        if (currentOwnerItem) {
+          currentOwnerItem.click();
+          
+          // Visuelles Feedback für die Auswahl
+          showEditMessage(`Aktuell ausgewählt: ${currentOwner}`, 'success');
+        }
+      }, 100);
+      
+      // Entferne Fokus nach Auswahl
+      setTimeout(() => {
+        editOwnerGrid.classList.remove('focused');
+      }, 2000);
+    }
+    
+    // Entferne alte Nachrichten
+    const messages = modal.querySelectorAll('.message');
+    messages.forEach(msg => msg.remove());
+  }
+}
+
+function hideEditItemModal() {
+  const modal = document.getElementById('editItemModal');
+  if (modal) {
+    modal.style.display = 'none';
+    
+    const messages = modal.querySelectorAll('.message');
+    messages.forEach(msg => msg.remove());
+  }
+}
+
+// =========================
+// EDIT NACHRICHT ANZEIGEN
+// =========================
+function showEditMessage(text, type) {
+  const modalBody = document.querySelector('#editItemModal .modal-body');
+  if (!modalBody) return;
+  
+  const existingMessages = modalBody.querySelectorAll('.message');
+  existingMessages.forEach(msg => msg.remove());
+  
+  const message = document.createElement('div');
+  message.className = `message ${type}`;
+  message.textContent = text;
+  
+  const form = document.getElementById('editItemForm');
+  if (form) {
+    form.appendChild(message);
   }
 }
 
@@ -844,24 +996,107 @@ async function addNewItem(event) {
   }
 }
 
+// ITEM BEARBEITEN
 // =========================
-// NACHRICHT ANZEIGEN
-// =========================
-function showMessage(text, type) {
-  const modalBody = document.querySelector('.modal-body');
-  if (!modalBody) return;
+async function editItem(event) {
+  event.preventDefault();
   
-  const existingMessages = modalBody.querySelectorAll('.message');
-  existingMessages.forEach(msg => msg.remove());
+  const itemId = document.getElementById('editItemId').value;
+  const itemName = document.getElementById('editItemName').value.trim();
+  const selectedOwner = document.querySelector('.edit-owner-select-item.selected');
   
-  const message = document.createElement('div');
-  message.className = `message ${type}`;
-  message.textContent = text;
-  
-  const form = document.getElementById('addItemForm');
-  if (form) {
-    form.appendChild(message);
+  if (!itemName) {
+    showEditMessage('Bitte gib einen Item-Namen ein.', 'error');
+    return;
   }
+  
+  if (!selectedOwner) {
+    showEditMessage('Bitte wähle einen Besitzer aus.', 'error');
+    return;
+  }
+  
+  const newOwner = selectedOwner.dataset.player;
+  
+  try {
+    // Hole die aktuellen Item-Informationen um den alten Besitzer zu vergleichen
+    const { data: currentItem, error: fetchError } = await window.supabaseClient
+      .from('team_items')
+      .select('storage')
+      .eq('id', itemId)
+      .single();
+    
+    if (fetchError) {
+      console.error('Fehler beim Abrufen des aktuellen Items:', fetchError);
+      showEditMessage('Fehler beim Abrufen des aktuellen Items.', 'error');
+      return;
+    }
+    
+    const oldOwner = currentItem.storage;
+    
+    // 1. Aktualisiere den Item-Namen und Besitzer in der team_items Tabelle
+    const { data, error } = await window.supabaseClient
+      .from('team_items')
+      .update({
+        name: itemName,
+        storage: newOwner
+      })
+      .eq('id', itemId);
+    
+    if (error) {
+      console.error('Fehler beim Bearbeiten des Items:', error);
+      showEditMessage('Fehler beim Bearbeiten des Items: ' + error.message, 'error');
+      return;
+    }
+    
+    // 2. Wenn sich der Besitzer geändert hat, aktualisiere auch die Item-Verwendung
+    if (oldOwner !== newOwner) {
+      // Entferne das Item vom alten Besitzer (falls es ihm ausgeliehen war)
+      await window.supabaseClient
+        .from('team_item_usage')
+        .delete()
+        .eq('item_id', itemId)
+        .eq('user_id', (await getUserIdByName(oldOwner)));
+      
+      // Füge das Item zum neuen Besitzer hinzu (falls es nicht bereits ausgeliehen ist)
+      const { data: existingUsage } = await window.supabaseClient
+        .from('team_item_usage')
+        .select('id')
+        .eq('item_id', itemId)
+        .eq('user_id', (await getUserIdByName(newOwner)))
+        .single();
+      
+      if (!existingUsage) {
+        await window.supabaseClient
+          .from('team_item_usage')
+          .insert([{ 
+            item_id: itemId, 
+            user_id: await getUserIdByName(newOwner) 
+          }]);
+      }
+    }
+    
+    showEditMessage(`Item "${itemName}" wurde erfolgreich aktualisiert! ${oldOwner !== newOwner ? `Besitzer wurde von ${oldOwner} zu ${newOwner} geändert.` : ''}`, 'success');
+    
+    setTimeout(() => {
+      hideEditItemModal();
+      loadTeamItems();
+    }, 1500);
+    
+  } catch (error) {
+    console.error('Fehler beim Bearbeiten des Items:', error);
+    showEditMessage('Ein unerwarteter Fehler ist aufgetreten.', 'error');
+  }
+}
+
+// Hilfsfunktion: User-ID anhand des Namens holen
+async function getUserIdByName(playerName) {
+  const { data: profile } = await window.supabaseClient
+    .from('profiles')
+    .select('id')
+    .eq('mc_name', playerName)
+    .single();
+  
+  return profile ? profile.id : null;
 }
 
 // =========================
@@ -963,6 +1198,31 @@ function setupEventListeners() {
     modalOverlay.addEventListener('click', (e) => {
       if (e.target === modalOverlay) {
         hideAddItemModal();
+      }
+    });
+  }
+
+  const closeEditModalBtn = document.getElementById('closeEditModalBtn');
+  const cancelEditModalBtn = document.getElementById('cancelEditModalBtn');
+  
+  if (closeEditModalBtn) {
+    closeEditModalBtn.addEventListener('click', hideEditItemModal);
+  }
+  
+  if (cancelEditModalBtn) {
+    cancelEditModalBtn.addEventListener('click', hideEditItemModal);
+  }
+  
+  const editItemForm = document.getElementById('editItemForm');
+  if (editItemForm) {
+    editItemForm.addEventListener('submit', editItem);
+  }
+  
+  const editModalOverlay = document.getElementById('editItemModal');
+  if (editModalOverlay) {
+    editModalOverlay.addEventListener('click', (e) => {
+      if (e.target === editModalOverlay) {
+        hideEditItemModal();
       }
     });
   }
@@ -1180,6 +1440,39 @@ function addCustomStyles() {
         opacity: 1;
       }
       
+      /* Minimalistischer Edit-Button */
+      .edit-item-btn {
+        position: absolute;
+        top: 6px;
+        right: 30px;
+        width: 20px;
+        height: 20px;
+        background: rgba(40, 167, 69, 0.1);
+        border: 1px solid rgba(40, 167, 69, 0.3);
+        border-radius: 50%;
+        color: #28a745;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        opacity: 0.7;
+        transition: all 0.2s;
+        z-index: 10;
+      }
+      
+      .edit-item-btn:hover {
+        opacity: 1;
+        background: rgba(40, 167, 69, 0.2);
+        border-color: #28a745;
+      }
+      
+      .team-item:hover .edit-item-btn {
+        opacity: 1;
+      }
+      
       /* Minimalistischer Remove-Holder Button */
       .remove-holder {
         margin-left: 6px;
@@ -1191,15 +1484,6 @@ function addCustomStyles() {
         transition: all 0.2s;
       }
       
-      .remove-holder:hover {
-        color: #dc3545;
-        background: rgba(220, 53, 69, 0.1);
-      }
-      
-      /* Animationen für Benachrichtigungen */
-      @keyframes slideIn {
-        from {
-          transform: translateX(100%);
           opacity: 0;
         }
         to {
@@ -1287,6 +1571,7 @@ function addGlobalEventListeners() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       hideAddItemModal();
+      hideEditItemModal();
     }
   });
 }

@@ -141,6 +141,39 @@
   </div>
 </div>
 
+<!-- MODAL FÜR ITEM BEARBEITEN -->
+<div class="modal-overlay" id="editItemModal" style="display: none;">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>✏️ Item bearbeiten</h2>
+      <button class="modal-close" id="closeEditModalBtn">×</button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="editItemForm">
+        <input type="hidden" id="editItemId">
+        
+        <div class="form-group">
+          <label for="editItemName">Item Name:</label>
+          <input type="text" id="editItemName" placeholder="z.B. Netherit-Pickaxe" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="editItemOwner">Besitzer (Spieler):</label>
+          <div class="owner-selection-grid" id="editOwnerSelectionGrid">
+            <!-- Spieler werden via JS geladen -->
+          </div>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="btn-submit">Änderungen speichern</button>
+          <button type="button" class="btn-cancel" id="cancelEditModalBtn">Abbrechen</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 </div><!-- Ende von mainContent -->
 
 <!-- =========================

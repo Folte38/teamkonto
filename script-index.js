@@ -510,18 +510,48 @@ async function loadPlayerPaymentStatus() {
   try {
     const { data: profiles, error: profilesError } = await window.supabaseClient
       .from("profiles")
-      .select("id, mc_name, payment_status");
+      .select("id, mc_name, payment_status, role");
     
     if (profilesError || !profiles) {
       el.innerHTML = '<div class="error">Fehler beim Laden der Spieler</div>';
       return;
     }
     
+    // Sortiere die Spieler: Admins zuerst, dann bezahlte Mitglieder, dann nicht bezahlte
+    profiles.sort((a, b) => {
+      // Priorität 1: Admins zuerst
+      if (a.role === "admin" && b.role !== "admin") return -1;
+      if (b.role === "admin" && a.role !== "admin") return 1;
+      
+      // Priorität 2: Bezahlte vor nicht bezahlten (nur bei Mitgliedern)
+      if (a.role !== "admin" && b.role !== "admin") {
+        if (a.payment_status === 1 && b.payment_status === 0) return -1;
+        if (b.payment_status === 1 && a.payment_status === 0) return 1;
+      }
+      
+      // Priorität 3: Alphabetisch bei gleicher Priorität
+      return a.mc_name.localeCompare(b.mc_name);
+    });
+    
     el.innerHTML = "";
     
     profiles.forEach(p => {
       const status = p.payment_status === 1 ? "paid" : "unpaid";
       const label = p.payment_status === 1 ? "Bezahlt" : "Nicht bezahlt";
+      const isAdmin = p.role === "admin";
+      const isMember = p.role === "member";
+      
+      // Bestimme das Icon und den Tooltip basierend auf der Rolle
+      let roleIcon = '';
+      let roleTooltip = '';
+      
+      if (isAdmin) {
+        roleIcon = '⚙️';
+        roleTooltip = 'Administrator';
+      } else if (isMember) {
+        roleIcon = '👤';
+        roleTooltip = 'Mitglied';
+      }
       
       el.innerHTML += `
         <div class="player ${status} ${IS_ADMIN ? 'clickable' : ''}" data-player-id="${p.id}" data-player-name="${p.mc_name}">
@@ -530,6 +560,7 @@ async function loadPlayerPaymentStatus() {
                onerror="this.src='https://mc-heads.net/avatar/Steve/64'">
           <div class="name">${p.mc_name}</div>
           <small>${label}</small>
+          ${roleIcon ? `<div class="role-icon" title="${roleTooltip}">${roleIcon}</div>` : ''}
         </div>
       `;
     });
