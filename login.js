@@ -84,6 +84,11 @@ async function login() {
     // 2. Zusätzliches Passwort überprüfen (falls gesetzt)
     if (profile.additional_password && profile.additional_password.trim() !== '') {
       console.log("Prüfe additional_password...");
+      
+      // Vor dem Login alle Session-Daten leren um Cache-Probleme zu vermeiden
+      localStorage.clear();
+      sessionStorage.clear();
+      
       if (profile.additional_password === password) {
         // additional_password stimmt überein - Login mit localStorage
         localStorage.setItem('currentUser', JSON.stringify({

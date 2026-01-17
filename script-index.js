@@ -27,15 +27,28 @@ async function checkLoginStatus() {
 checkLoginStatus();
 
 // APP INITIALISIERUNG
-function initializeApp() {
-  loadProfile().then(() => {
-    loadWeeks();
-    loadPaymentsFromDB();
-    loadPlayerPaymentStatus();
-    loadArchive();
-    loadTeamGoals();
+async function initializeApp() {
+  try {
+    console.log("Initialisiere App...");
+    
+    // Warte auf Profil-Ladung
+    await loadProfile();
+    console.log("Profil geladen, lade restliche Komponenten...");
+    
+    // Lade restliche Komponenten nacheinander
+    await loadWeeks();
+    await loadPaymentsFromDB();
+    await loadPlayerPaymentStatus();
+    await loadArchive();
+    await loadTeamGoals();
+    
     // Event Listener werden nach DOM-Laden eingerichtet
-  });
+    setupEventListeners();
+    console.log("App-Initialisierung abgeschlossen");
+    
+  } catch (error) {
+    console.error("Fehler bei App-Initialisierung:", error);
+  }
 }
 
 // Event Listener nach DOM-Laden einrichten
@@ -117,6 +130,9 @@ function setupEventListeners() {
     try {
       const playerBox = e.target.closest(".player.clickable");
       console.log("Spieler Click:", playerBox, "IS_ADMIN:", IS_ADMIN);
+      
+      // Globale Variable für andere Seiten verfügbar machen
+      window.IS_ADMIN = IS_ADMIN;
       
       if (playerBox && IS_ADMIN) {
         const playerId = playerBox.dataset.playerId;
@@ -337,7 +353,7 @@ const START_BALANCE = 7000000;
 const WEEKLY_CONTRIBUTION = 2000000;
 const CURRENT_WEEK = getCurrentWeek();
 
-let SELECTED_WEEK = CURRENT_WEEK;
+let SELECTED_WEEK = null; // Start mit null, dann setzen wenn select.value existiert
 let IS_ADMIN = false;
 let EDITING_GOAL_ID = null;
 
@@ -480,7 +496,7 @@ async function loadWeeks() {
     select.appendChild(opt);
   });
 
-  SELECTED_WEEK = select.value || CURRENT_WEEK;
+  SELECTED_WEEK = select.value || CURRENT_WEEK; // Immer CURRENT_WEEK als Fallback verwenden
 
   if (wrapper) {
     wrapper.style.display = weeks.length > 1 ? "flex" : "none";
@@ -505,6 +521,7 @@ async function loadPaymentsFromDB() {
   });
 
   const income = beitrag + spende;
+  // Kontostand aus der Datenbank berechnen (nicht nur START_BALANCE)
   const balance = START_BALANCE + income - ausgabe;
 
   document.getElementById("income").textContent = formatMoney(income);
@@ -902,19 +919,24 @@ async function markPlayerAsUnpaid(playerId, playerName) {
 
 // ARCHIV
 async function loadArchive() {
+  console.log("=== DEBUG loadArchive() ===");
+  console.log("SELECTED_WEEK:", SELECTED_WEEK);
+  console.log("CURRENT_WEEK:", CURRENT_WEEK);
+  
+  // Stelle sicher, dass SELECTED_WEEK gesetzt ist
+  if (!SELECTED_WEEK) {
+    SELECTED_WEEK = CURRENT_WEEK;
+    console.log("SELECTED_WEEK war null, gesetzt auf:", SELECTED_WEEK);
+  }
+  
+  console.log("Week Filter:", SELECTED_WEEK && SELECTED_WEEK !== "" ? SELECTED_WEEK : CURRENT_WEEK);
+  
   const el = document.getElementById("archiveList");
   if (!el) return;
 
   const { data, error } = await window.supabaseClient
     .from("payments")
-    .select(`
-      id,
-      type,
-      amount,
-      note,
-      created_at,
-      profiles ( mc_name )
-    `)
+    .select("id, type, amount, note, created_at, profiles ( mc_name )")
     .eq("week", SELECTED_WEEK && SELECTED_WEEK !== "" ? SELECTED_WEEK : CURRENT_WEEK)
     .order("created_at", { ascending: false })
     .limit(15);

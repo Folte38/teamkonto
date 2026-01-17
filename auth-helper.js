@@ -44,6 +44,8 @@ async function getCurrentUser() {
   
   if (auth.authenticated) {
     if (auth.method === 'additional_password') {
+      console.log("getCurrentUser: additional_password Methode für", auth.user.mc_name);
+      
       // Für additional_password Methode, Profil aus Datenbank holen
       const { data: profile, error } = await supabaseClient
         .from('profiles')
@@ -52,6 +54,11 @@ async function getCurrentUser() {
         .single();
       
       if (profile && !error) {
+        console.log("Profil aus Datenbank geladen:", profile);
+        
+        // set_config RPC existiert nicht, überspringen
+        console.log("Überspringe set_config (RPC existiert nicht)");
+        
         return {
           ...profile,
           id: profile.id || auth.user.id,
@@ -59,9 +66,21 @@ async function getCurrentUser() {
           email: `${profile.mc_name}@teamhp.local`,
           method: 'additional_password'
         };
+      } else {
+        console.log("Datenbankabfrage fehlgeschlagen, nutze localStorage Daten:", error);
+        // Fallback: nutze die Daten aus localStorage
+        return {
+          ...auth.user,
+          id: auth.user.id || auth.user.mc_name,
+          mc_name: auth.user.mc_name,
+          email: `${auth.user.mc_name}@teamhp.local`,
+          role: 'user', // Standardrolle
+          method: 'additional_password'
+        };
       }
     } else {
       // Supabase Methode
+      console.log("getCurrentUser: Supabase Methode für", auth.user.email);
       return {
         ...auth.user,
         method: 'supabase'
@@ -69,24 +88,34 @@ async function getCurrentUser() {
     }
   }
   
+  console.log("getCurrentUser: Nicht authentifiziert");
   return null;
 }
 
 // Logout Funktion für beide Methoden
 async function logout() {
   try {
-    // localStorage leeren
-    localStorage.removeItem('currentUser');
+    console.log("🚪 Starte Logout-Prozess...");
     
-    // Supabase logout
+    // 1. Alle localStorage Daten leeren (komplett)
+    localStorage.clear();
+    
+    // 2. Supabase Session komplett leeren
     await supabaseClient.auth.signOut();
     
-    // Zur Login-Seite weiterleiten
-    window.location.href = 'login.html';
+    // 3. Session Storage leeren (falls vorhanden)
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear();
+    }
+    
+    // 4. Erzwungener Reload zur Login-Seite (mit Cache-Busting)
+    const timestamp = new Date().getTime();
+    window.location.href = `login.html?t=${timestamp}`;
+    
   } catch (error) {
     console.error("Logout Fehler:", error);
-    // Trotzdem zur Login-Seite weiterleiten
-    window.location.href = 'login.html';
+    // Trotzdem erzwungener Reload
+    window.location.href = `login.html?t=${new Date().getTime()}`;
   }
 }
 

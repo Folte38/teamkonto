@@ -1,15 +1,30 @@
 // =========================
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-window.supabaseClient.auth.getSession().then(({ data }) => {
-  if (!data.session) {
-    // Nicht eingeloggt -> Login-Seite anzeigen
+document.addEventListener("DOMContentLoaded", async function() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'none';
   } else {
-    // Eingeloggt -> Hauptinhalt anzeigen
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
+    
+    // Navigation initialisieren wie bei index.html
+    const navUser = document.getElementById("navUser");
+    const navUsername = document.getElementById("navUsername");
+    const navAvatar = document.getElementById("navAvatar");
+    
+    if (navUser && navUsername && navAvatar) {
+      const currentUser = await window.getCurrentUser();
+      if (currentUser) {
+        navUsername.innerText = currentUser.mc_name;
+        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+        navUser.style.display = "flex";
+      }
+    }
+    
     loadProfile();
     initializeServerStatus();
   }
@@ -108,32 +123,40 @@ let CURRENT_USER_ID = null;
 let CURRENT_MC_NAME = null;
 let IS_ADMIN = false;
 let SEARCH_TERM = '';
+let AUTH_METHOD = null; // Neue Variable für Auth-Methode
 
 // =========================
-// PROFIL & NAV
+// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
 // =========================
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-  CURRENT_USER_ID = user.id;
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
 
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
-  if (!profile) return;
-
-  CURRENT_MC_NAME = profile.mc_name;
   IS_ADMIN = profile.role === "admin";
 
   const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
   if (navUser) {
-    document.getElementById("navUsername").innerText = profile.mc_name;
-    document.getElementById("navAvatar").src =
-      `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    navUsername.innerText = profile.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
   }
 
@@ -148,6 +171,7 @@ async function loadProfile() {
     currentUserName.textContent = profile.mc_name;
   }
 
+  console.log("Rufe loadLagerItems() auf");
   loadLagerItems();
 }
 
@@ -155,31 +179,51 @@ async function loadProfile() {
 // LAGER ITEMS LADEN
 // =========================
 async function loadLagerItems() {
+  console.log('=== Lade Lager Items ===');
+  console.log('CURRENT_USER_ID:', CURRENT_USER_ID);
+  console.log('CURRENT_MC_NAME:', CURRENT_MC_NAME);
+  console.log('IS_ADMIN:', IS_ADMIN);
+  
   const container = document.getElementById("lagerItems");
-  if (!container) return;
-
-  let { data: items } = await window.supabaseClient
-    .from("team_lager_items")
-    .select("id, name, quantity, added_by, created_at")
-    .order("created_at", { ascending: false });
-
-  // Filter anwenden
-  if (SEARCH_TERM) {
-    items = items.filter(item => 
-      item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase())
-    );
-  }
-
-  container.innerHTML = '';
-
-  if (items.length === 0) {
-    container.innerHTML = `
-      <div class="no-items">
-        ${SEARCH_TERM ? `Keine Items gefunden für "${SEARCH_TERM}"` : 'Keine Items im Lager vorhanden'}
-      </div>
-    `;
+  if (!container) {
+    console.log("Container 'lagerItems' nicht gefunden");
     return;
   }
+
+  try {
+    let { data: items, error } = await window.supabaseClient
+      .from("team_lager_items")
+      .select("id, name, quantity, added_by, created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error('Fehler beim Laden von team_lager_items:', error);
+      container.innerHTML = '<p class="no-items">Fehler beim Laden der Lager-Items: ' + error.message + '</p>';
+      return;
+    }
+
+    console.log('Gefundene Lager-Items:', items?.length || 0);
+    if (items && items.length > 0) {
+      console.log('Beispiel-Lager-Item:', items[0]);
+    }
+
+    // Filter anwenden
+    if (SEARCH_TERM) {
+      items = items.filter(item => 
+        item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase())
+      );
+    }
+
+    container.innerHTML = '';
+
+    if (items.length === 0) {
+      container.innerHTML = `
+        <div class="no-items">
+          ${SEARCH_TERM ? `Keine Items gefunden für "${SEARCH_TERM}"` : 'Keine Items im Lager vorhanden'}
+        </div>
+      `;
+      return;
+    }
 
   // Grid für Lager-Items
   const itemsGrid = document.createElement('div');
@@ -219,13 +263,16 @@ async function loadLagerItems() {
       </div>
     `;
     
-    itemsGrid.appendChild(itemElement);
+    container.appendChild(itemElement);
   });
 
-  container.appendChild(itemsGrid);
-  
   // Statistik aktualisieren
   updateLagerStatistics(items);
+  
+  } catch (error) {
+    console.error('Fehler in loadLagerItems:', error);
+    container.innerHTML = '<p class="no-items">Fehler beim Laden: ' + error.message + '</p>';
+  }
 }
 
 // =========================
@@ -373,8 +420,8 @@ async function addLagerItem(event) {
       key: uniqueKey,
       name: itemName,
       quantity: quantity,
-      added_by: CURRENT_MC_NAME,
-      user_id: CURRENT_USER_ID
+      added_by: CURRENT_MC_NAME
+      // user_id wird nicht verwendet, da team_lager_items diese Spalte nicht hat
     });
     
     const { data, error } = await window.supabaseClient
@@ -397,14 +444,9 @@ async function addLagerItem(event) {
         code: error.code
       });
       
-      // Spezifische Fehlermeldungen
-      if (error.message.includes('row-level security')) {
-        showMessage('Fehler: Keine Berechtigung zum Hinzufügen von Items. Bitte kontaktiere einen Admin.', 'error');
-      } else if (error.message.includes('duplicate key')) {
-        showMessage('Fehler: Dieses Item existiert bereits.', 'error');
-      } else {
-        showMessage('Fehler beim Hinzufügen des Items: ' + error.message, 'error');
-      }
+      // Bessere Fehlermeldung für Benutzer
+      const errorMessage = error.message || 'Unbekannter Fehler';
+      showLagerMessage(`Fehler beim Hinzufügen: ${errorMessage}`, 'error');
       return;
     }
     

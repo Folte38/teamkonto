@@ -1,27 +1,27 @@
 // =========================
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-document.addEventListener("DOMContentLoaded", function() {
-  window.supabaseClient.auth.getSession().then(({ data }) => {
-    if (!data.session) {
-      // Nicht eingeloggt - zeige Login-Seite
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('mainContent').style.display = 'none';
-    } else {
-      // Eingeloggt - zeige Inhalt
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      initializeApp();
-      initializeServerStatus();
-      
-      // Login-Benachrichtigung prüfen (einmalig pro Session)
-      if (window.checkAndSendLoginNotification) {
-        setTimeout(() => {
-          window.checkAndSendLoginNotification();
-        }, 1000);
-      }
-    }
-  });
+document.addEventListener("DOMContentLoaded", async function() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  
+  initializeApp();
+  initializeServerStatus();
+  
+  // Login-Benachrichtigung prüfen (einmalig pro Session)
+  if (window.checkAndSendLoginNotification) {
+    setTimeout(() => {
+      window.checkAndSendLoginNotification();
+    }, 1000);
+  }
 });
 
 // =========================
@@ -115,37 +115,38 @@ let SELECTED_DATE = null;
 let SELECTED_PLAYERS = new Set(); // Set für ausgewählte Spieler
 
 // =========================
-// PROFIL & NAV
+// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
 // =========================
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-  CURRENT_USER_ID = user.id;
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
 
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
-  if (!profile) return;
-
-  CURRENT_MC_NAME = profile.mc_name;
   IS_ADMIN = profile.role === "admin";
 
   const navUser = document.getElementById("navUser");
-  if (navUser) {
-    document.getElementById("navUsername").innerText = profile.mc_name;
-    document.getElementById("navAvatar").src =
-      `https://mc-heads.net/avatar/${profile.mc_name}/64`;
-    navUser.style.display = "flex";
-  }
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
 
-  // Logout-Button anzeigen
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.style.display = "block";
+  if (navUser) {
+    navUsername.innerText = profile.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    navUser.style.display = "flex";
   }
 }
 
@@ -327,6 +328,15 @@ async function openPlayerModal(date, dayElement) {
   const playerGrid = document.getElementById('playerGrid');
   const noteInput = document.getElementById('dayNote');
   const selectedPlayersList = document.getElementById('selectedPlayersList');
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
+  if (navUser) {
+    navUsername.innerText = currentUser.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+    navUser.style.display = "flex";
+  }
   
   modalTitle.textContent = formatDateDisplay(date);
   
@@ -518,6 +528,26 @@ function setupEventListeners() {
     }
   });
 }
+
+// Navigation initialisieren
+document.addEventListener("DOMContentLoaded", async function() {
+  // Bestehende Initialisierung
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  
+  // Navigation initialisieren
+  if (typeof setupAuth === 'function') {
+    await setupAuth();
+  }
+});
 
 // =========================
 // KALENDER DATENBANK OPERATIONEN

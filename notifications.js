@@ -143,12 +143,37 @@ let notificationsChannel = null;
 let currentUserId = null;
 let currentMcName = null;
 
-// Aktuellen Benutzer laden
+// Aktuellen Benutzer laden (beide Methoden) - EINFACHE LÖSUNG
 async function loadCurrentUser() {
-  if (!window.supabaseClient) return;
+  console.log("🔍 DEBUG: loadCurrentUser() aufgerufen");
+  
+  // Zuerst versuchen über auth-helper.js
+  if (window.getCurrentUser) {
+    try {
+      const currentUser = await window.getCurrentUser();
+      console.log("🔍 DEBUG: currentUser von auth-helper:", currentUser);
+      
+      if (currentUser) {
+        currentUserId = currentUser.id;
+        currentMcName = currentUser.mc_name;
+        console.log("✅ DEBUG: Benutzer geladen:", currentMcName);
+        return;
+      }
+    } catch (error) {
+      console.error("❌ DEBUG: Fehler bei auth-helper:", error);
+    }
+  }
+  
+  // Fallback: Direkt über Supabase
+  if (!window.supabaseClient) {
+    console.error("❌ DEBUG: Supabase Client nicht verfügbar");
+    return;
+  }
   
   try {
     const { data: { user } } = await window.supabaseClient.auth.getUser();
+    console.log("🔍 DEBUG: Supabase user:", user);
+    
     if (user) {
       currentUserId = user.id;
       
@@ -161,10 +186,15 @@ async function loadCurrentUser() {
       
       if (profile) {
         currentMcName = profile.mc_name;
+        console.log("✅ DEBUG: Profil geladen:", currentMcName);
+      } else {
+        console.error("❌ DEBUG: Profil nicht gefunden für user:", user.id);
       }
+    } else {
+      console.error("❌ DEBUG: Kein Supabase user gefunden");
     }
   } catch (error) {
-    console.error('Fehler beim Laden des aktuellen Benutzers:', error);
+    console.error("❌ DEBUG: Fehler beim Laden des Benutzers:", error);
   }
 }
 

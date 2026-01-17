@@ -7,10 +7,41 @@ class MarketDashboard {
     this.categories = [];
     this.filteredData = null;
     this.previousPrices = {};
+    this.isSubmitting = false; // Debounce Variable
     this.init();
   }
 
   async init() {
+    // Exakte Logik von index.html
+    const currentUser = await window.getCurrentUser();
+    if (!currentUser) return Promise.resolve();
+
+    // Für additional_password Methode müssen wir das Profil anders laden
+    let profile;
+    if (currentUser.method === 'additional_password') {
+      profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+    } else {
+      // Supabase Methode - altes Verhalten
+      const { data: profileData, error } = await window.supabaseClient
+        .from("profiles")
+        .select("mc_name, role")
+        .eq("id", currentUser.id)
+        .single();
+
+      if (error || !profileData) return Promise.resolve();
+      profile = profileData;
+    }
+
+    const navUser = document.getElementById("navUser");
+    const navUsername = document.getElementById("navUsername");
+    const navAvatar = document.getElementById("navAvatar");
+
+    if (navUser) {
+      navUsername.innerText = profile.mc_name;
+      navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+      navUser.style.display = "flex";
+    }
+    
     await this.setupAuth();
     await this.loadMarketData();
     this.setupEventListeners();
@@ -30,24 +61,13 @@ class MarketDashboard {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
     
-    // Navigation Setup
-    const currentUser = await window.getCurrentUser();
-    if (currentUser) {
-      const navUser = document.getElementById("navUser");
-      const navUsername = document.getElementById("navUsername");
-      const navAvatar = document.getElementById("navAvatar");
-
-      if (navUser && navUsername && navAvatar) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-      }
-    }
+    // Navigation Setup - bereits in init() gemacht, hier überspringen
+    // Die Navigation wird bereits korrekt in init() initialisiert
   }
 
   async loadMarketData() {
     try {
-      console.log("🔄 Lade Marktdaten...");
+      console.log(" Lade Marktdaten...");
       
       // Lade Kategorien
       const categoriesResponse = await fetch('https://api.opsucht.net/market/categories');
@@ -816,6 +836,14 @@ class MarketDashboard {
   }
 
   async handleItemEntry() {
+    // Debounce-Schutz gegen doppelte Einträge
+    if (this.isSubmitting) {
+      console.log('⚠️ Eintrag wird bereits verarbeitet - ignoriere doppelten Klick');
+      return;
+    }
+    
+    this.isSubmitting = true;
+    
     const playerSelect = document.getElementById('playerSelect');
     const playerName = playerSelect.value.trim();
     const amount = parseInt(document.getElementById('itemAmount').value);
@@ -825,6 +853,7 @@ class MarketDashboard {
     
     if (!playerName || !amount) {
       this.showNotification('Bitte Spieler auswählen und Menge eingeben', 'error');
+      this.isSubmitting = false;
       return;
     }
     
@@ -845,6 +874,7 @@ class MarketDashboard {
       if (insertError) {
         console.error('Fehler beim Einfügen:', insertError);
         this.showNotification('Fehler beim Speichern in der Datenbank', 'error');
+        this.isSubmitting = false;
         return;
       }
 
@@ -866,13 +896,21 @@ class MarketDashboard {
       // 3. Haupt-Grid aktualisieren (für MC-Heads)
       await this.renderItems();
       
-      // 4. Modal NICHT schließen, damit man die Änderungen sieht
+      // 4. Modal schließen um doppelte Einträge zu verhindern
+      const modalOverlay = document.getElementById('itemDetailsModal');
+      if (modalOverlay) {
+        modalOverlay.style.display = 'none';
+      }
+      
+      // 5. Submit-Flag zurücksetzen
+      this.isSubmitting = false;
       
       console.log('🔄 LIVE-UPDATES: Alle Ansichten aktualisiert!');
 
     } catch (error) {
       console.error('Fehler beim Eintragen:', error);
       this.showNotification('Fehler beim Eintragen', 'error');
+      this.isSubmitting = false; // Reset bei Fehler
     }
   }
 
@@ -959,6 +997,26 @@ class MarketDashboard {
     }
   }
 }
+
+// Navigation initialisieren
+document.addEventListener("DOMContentLoaded", async function() {
+  // Bestehende Initialisierung
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  
+  // Navigation initialisieren
+  if (typeof setupAuth === 'function') {
+    await setupAuth();
+  }
+});
 
 // Init Dashboard
 document.addEventListener('DOMContentLoaded', () => {

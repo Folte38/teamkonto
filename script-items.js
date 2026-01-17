@@ -1,25 +1,40 @@
 // =========================
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-document.addEventListener("DOMContentLoaded", function() {
-  window.supabaseClient.auth.getSession().then(({ data }) => {
-    if (!data.session) {
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('mainContent').style.display = 'none';
-    } else {
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      initializeApp();
-      initializeServerStatus();
-      
-      // Login-Benachrichtigung prüfen (einmalig pro Session)
-      if (window.checkAndSendLoginNotification) {
-        setTimeout(() => {
-          window.checkAndSendLoginNotification();
-        }, 1000);
+document.addEventListener("DOMContentLoaded", async function() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+  } else {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    
+    // Navigation initialisieren wie bei index.html
+    const navUser = document.getElementById("navUser");
+    const navUsername = document.getElementById("navUsername");
+    const navAvatar = document.getElementById("navAvatar");
+    
+    if (navUser && navUsername && navAvatar) {
+      const currentUser = await window.getCurrentUser();
+      if (currentUser) {
+        navUsername.innerText = currentUser.mc_name;
+        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+        navUser.style.display = "flex";
       }
     }
-  });
+    
+    initializeApp();
+    initializeServerStatus();
+    
+    // Login-Benachrichtigung prüfen (einmalig pro Session)
+    if (window.checkAndSendLoginNotification) {
+      setTimeout(() => {
+        window.checkAndSendLoginNotification();
+      }, 1000);
+    }
+  }
 });
 
 // =========================
@@ -98,32 +113,40 @@ let SELECTED_PLAYER = null;
 let SEARCH_TERM = '';
 let ALL_PLAYERS = [];
 let ALL_PROFILES = [];
+let AUTH_METHOD = null; // Neue Variable für Auth-Methode
 
 // =========================
-// PROFIL & NAV
+// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
 // =========================
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-  CURRENT_USER_ID = user.id;
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
 
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
-  if (!profile) return;
-
-  CURRENT_MC_NAME = profile.mc_name;
   IS_ADMIN = profile.role === "admin";
 
   const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
   if (navUser) {
-    document.getElementById("navUsername").innerText = profile.mc_name;
-    document.getElementById("navAvatar").src =
-      `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    navUsername.innerText = profile.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
   }
 }
@@ -398,232 +421,277 @@ async function loadTeamItems() {
   const container = document.getElementById("teamItems");
   if (!container) return;
 
-  const { data: items } = await window.supabaseClient
-    .from("team_items")
-    .select("id, name, storage")
-    .order("storage")
-    .order("name");
+  console.log('=== Lade Team Items ===');
+  console.log('CURRENT_USER_ID:', CURRENT_USER_ID);
+  console.log('CURRENT_MC_NAME:', CURRENT_MC_NAME);
+  console.log('IS_ADMIN:', IS_ADMIN);
 
-  const { data: usage } = await window.supabaseClient
-    .from("team_item_usage")
-    .select("item_id, user_id, profiles ( mc_name )");
+  try {
+    const { data: items, error: itemsError } = await window.supabaseClient
+      .from("team_items")
+      .select("id, name, storage")
+      .order("storage")
+      .order("name");
 
-  let filteredItems = items;
-  
-  if (SELECTED_PLAYER) {
-    filteredItems = filteredItems.filter(item => item.storage === SELECTED_PLAYER);
-  }
-  
-  if (SEARCH_TERM) {
-    filteredItems = filteredItems.filter(item => 
-      item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase()) ||
-      item.storage.toLowerCase().includes(SEARCH_TERM.toLowerCase())
-    );
-  }
-
-  const byStorage = {};
-  filteredItems.forEach(item => {
-    if (!byStorage[item.storage]) byStorage[item.storage] = [];
-    byStorage[item.storage].push(item);
-  });
-
-  container.innerHTML = '';
-
-  // EINZELANSICHT
-  if (SELECTED_PLAYER) {
-    const playerItems = byStorage[SELECTED_PLAYER] || [];
-    
-    const backBtn = document.createElement('button');
-    backBtn.className = 'back-to-grid';
-    backBtn.innerHTML = '← Zurück zur Übersicht';
-    backBtn.addEventListener('click', switchToGridView);
-    container.appendChild(backBtn);
-    
-    const singleView = document.createElement('div');
-    singleView.className = 'single-player-view';
-    singleView.innerHTML = `
-      <div class="single-player-header">
-        <img src="https://mc-heads.net/body/${SELECTED_PLAYER}/256" 
-             class="single-player-avatar" 
-             alt="${SELECTED_PLAYER}">
-        <div class="single-player-info">
-          <div class="single-player-name">${SELECTED_PLAYER}</div>
-          <div class="single-player-stats">${playerItems.length} Items verfügbar</div>
-        </div>
-      </div>
-      <div class="player-items">
-    `;
-    
-    const itemsContainer = document.createElement('div');
-    itemsContainer.className = 'player-items';
-    itemsContainer.style.display = 'grid';
-    itemsContainer.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
-    itemsContainer.style.gap = '12px';
-    
-    if (playerItems.length === 0) {
-      itemsContainer.innerHTML = '<div class="no-items">Keine Items vorhanden</div>';
-    } else {
-      playerItems.forEach(item => {
-        const holder = usage.find(u => u.item_id === item.id);
-        let statusHtml = "";
-        let isMine = false;
-        let isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
-
-        if (!holder) {
-          statusHtml = `<div class="item-available">verfügbar</div>`;
-        } else {
-          const name = holder.profiles?.mc_name || "Unbekannt";
-          isMine = holder.user_id === CURRENT_USER_ID;
-
-          statusHtml = `
-            <div class="item-holder">
-              <img src="https://mc-heads.net/avatar/${name}/24">
-              <span>ausgeliehen von ${name}</span>
-              ${
-                IS_ADMIN && !isMine
-                  ? `<span class="remove-holder"
-                          data-item="${item.id}"
-                          data-user="${holder.user_id}">✕</span>`
-                  : ""
-              }
-            </div>
-          `;
-        }
-
-        // Minimalistischer Entfernen-Button
-        const removeButtonHtml = IS_ADMIN 
-          ? `<button class="remove-item-btn admin-only" title="Item entfernen">×</button>`
-          : '';
-
-        // Edit-Button für Admins
-        const editButtonHtml = IS_ADMIN 
-          ? `<button class="edit-item-btn admin-only" title="Item bearbeiten">✏️</button>`
-          : '';
-
-        const itemElement = document.createElement('div');
-        itemElement.className = `team-item ${isMine ? "mine" : ""} ${isHighlighted ? "item-highlight" : ""}`;
-        itemElement.dataset.id = item.id;
-        itemElement.dataset.name = item.name;
-        itemElement.dataset.owner = item.storage;
-        itemElement.innerHTML = `
-          ${removeButtonHtml}
-          ${editButtonHtml}
-          <div class="item-name">${item.name}</div>
-          ${statusHtml}
-        `;
-        
-        itemsContainer.appendChild(itemElement);
+    if (itemsError) {
+      console.error('Fehler beim Laden von team_items:', itemsError);
+      console.error('Fehler Details:', {
+        message: itemsError.message,
+        details: itemsError.details,
+        hint: itemsError.hint,
+        code: itemsError.code
       });
-    }
-    
-    container.appendChild(singleView);
-    singleView.appendChild(itemsContainer);
-    
-    return;
-  }
-
-  // GRID-ANSICHT
-  const playersToShow = SEARCH_TERM 
-    ? ALL_PLAYERS.filter(player => 
-        player.toLowerCase().includes(SEARCH_TERM.toLowerCase()) ||
-        (byStorage[player] && byStorage[player].some(item => 
-          item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase())
-        ))
-      )
-    : ALL_PLAYERS;
-
-  playersToShow.forEach(player => {
-    const playerItems = byStorage[player] || [];
-    const hasMatchingItems = SEARCH_TERM 
-      ? playerItems.some(item => item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase()))
-      : true;
-
-    if (SEARCH_TERM && !hasMatchingItems && !player.toLowerCase().includes(SEARCH_TERM.toLowerCase())) {
+      container.innerHTML = '<p class="no-items">Fehler beim Laden der Items: ' + itemsError.message + '</p>';
       return;
     }
 
-    let rowHtml = `
-      <div class="player-row">
-        <div class="player-avatar">
-          <img src="https://mc-heads.net/body/${player}/256">
-          <div class="player-name">${player}</div>
-        </div>
+    console.log('Gefundene Items:', items?.length || 0);
+    if (items && items.length > 0) {
+      console.log('Beispiel-Item:', items[0]);
+    }
 
-        <div class="player-items">
-    `;
+    const { data: usage, error: usageError } = await window.supabaseClient
+      .from("team_item_usage")
+      .select("item_id, user_id, profiles ( mc_name )");
 
-    if (playerItems.length === 0) {
-      rowHtml += `
-        <div class="no-items-message">
-          Keine Items vorhanden
-        </div>
-      `;
+    if (usageError) {
+      console.error('Fehler beim Laden von team_item_usage:', usageError);
+      console.error('Usage Fehler Details:', {
+        message: usageError.message,
+        details: usageError.details,
+        hint: usageError.hint,
+        code: usageError.code
+      });
     } else {
-      playerItems.forEach(item => {
-        const holder = usage.find(u => u.item_id === item.id);
-        let statusHtml = "";
-        let isMine = false;
-        let isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
+      console.log('Gefundene Usage-Einträge:', usage?.length || 0);
+    }
 
-        if (!holder) {
-          statusHtml = `<div class="item-available">verfügbar</div>`;
-        } else {
-          const name = holder.profiles?.mc_name || "Unbekannt";
-          isMine = holder.user_id === CURRENT_USER_ID;
+    let filteredItems = items || [];
+    
+    if (SELECTED_PLAYER) {
+      filteredItems = filteredItems.filter(item => item.storage === SELECTED_PLAYER);
+    }
+    
+    if (SEARCH_TERM) {
+      filteredItems = filteredItems.filter(item => 
+        item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase()) ||
+        item.storage.toLowerCase().includes(SEARCH_TERM.toLowerCase())
+      );
+    }
 
-          statusHtml = `
-            <div class="item-holder">
-              <img src="https://mc-heads.net/avatar/${name}/24">
-              <span>ausgeliehen von ${name}</span>
-              ${
-                IS_ADMIN && !isMine
-                  ? `<span class="remove-holder"
-                          data-item="${item.id}"
-                          data-user="${holder.user_id}">✕</span>`
-                  : ""
-              }
-            </div>
-          `;
-        }
+    console.log('Gefilterte Items:', filteredItems.length);
 
-        // Minimalistischer Entfernen-Button
-        const removeButtonHtml = IS_ADMIN 
-          ? `<button class="remove-item-btn admin-only" title="Item entfernen">×</button>`
-          : '';
+    const byStorage = {};
+    filteredItems.forEach(item => {
+      if (!byStorage[item.storage]) byStorage[item.storage] = [];
+      byStorage[item.storage].push(item);
+    });
 
-        // Edit-Button für Admins
-        const editButtonHtml = IS_ADMIN 
-          ? `<button class="edit-item-btn admin-only" title="Item bearbeiten">✏️</button>`
-          : '';
+    container.innerHTML = '';
 
-        rowHtml += `
-          <div class="team-item ${isMine ? "mine" : ""} ${isHighlighted ? "item-highlight" : ""}"
-               data-id="${item.id}"
-               data-name="${item.name}"
-               data-owner="${player}">
+    // EINZELANSICHT
+    if (SELECTED_PLAYER) {
+      const playerItems = byStorage[SELECTED_PLAYER] || [];
+      
+      const backBtn = document.createElement('button');
+      backBtn.className = 'back-to-grid';
+      backBtn.innerHTML = '← Zurück zur Übersicht';
+      backBtn.addEventListener('click', switchToGridView);
+      container.appendChild(backBtn);
+      
+      const singleView = document.createElement('div');
+      singleView.className = 'single-player-view';
+      singleView.innerHTML = `
+        <div class="single-player-header">
+          <img src="https://mc-heads.net/body/${SELECTED_PLAYER}/256" 
+               class="single-player-avatar" 
+               alt="${SELECTED_PLAYER}">
+          <div class="single-player-info">
+            <div class="single-player-name">${SELECTED_PLAYER}</div>
+            <div class="single-player-stats">${playerItems.length} Items verfügbar</div>
+          </div>
+        </div>
+        <div class="player-items">
+      `;
+      
+      const itemsContainer = document.createElement('div');
+      itemsContainer.className = 'player-items';
+      itemsContainer.style.display = 'grid';
+      itemsContainer.style.gridTemplateColumns = 'repeat(auto-fill, minmax(140px, 1fr))';
+      itemsContainer.style.gap = '12px';
+      
+      if (playerItems.length === 0) {
+        itemsContainer.innerHTML = '<div class="no-items">Keine Items vorhanden</div>';
+      } else {
+        playerItems.forEach(item => {
+          const holder = usage.find(u => u.item_id === item.id);
+          let statusHtml = "";
+          let isMine = false;
+          let isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
+
+          if (!holder) {
+            statusHtml = `<div class="item-available">verfügbar</div>`;
+          } else {
+            const name = holder.profiles?.mc_name || "Unbekannt";
+            isMine = AUTH_METHOD === 'additional_password' 
+            ? (holder.profiles?.mc_name === CURRENT_MC_NAME) 
+            : (holder.user_id === CURRENT_USER_ID);
+
+            statusHtml = `
+              <div class="item-holder">
+                <img src="https://mc-heads.net/avatar/${name}/24">
+                <span>ausgeliehen von ${name}</span>
+                ${
+                  IS_ADMIN && !isMine
+                    ? `<span class="remove-holder"
+                            data-item="${item.id}"
+                            data-user="${holder.user_id}">✕</span>`
+                    : ""
+                }
+              </div>
+            `;
+          }
+
+          // Minimalistischer Entfernen-Button
+          const removeButtonHtml = IS_ADMIN 
+            ? `<button class="remove-item-btn admin-only" title="Item entfernen">×</button>`
+            : '';
+
+          // Edit-Button für Admins
+          const editButtonHtml = IS_ADMIN 
+            ? `<button class="edit-item-btn admin-only" title="Item bearbeiten">✏️</button>`
+            : '';
+
+          const itemElement = document.createElement('div');
+          itemElement.className = `team-item ${isMine ? "mine" : ""} ${isHighlighted ? "item-highlight" : ""}`;
+          itemElement.dataset.id = item.id;
+          itemElement.dataset.name = item.name;
+          itemElement.dataset.owner = item.storage;
+          itemElement.innerHTML = `
             ${removeButtonHtml}
             ${editButtonHtml}
             <div class="item-name">${item.name}</div>
             ${statusHtml}
-          </div>
-        `;
-      });
+          `;
+          
+          itemsContainer.appendChild(itemElement);
+        });
+      }
+      
+      container.appendChild(singleView);
+      singleView.appendChild(itemsContainer);
+      
+      return;
     }
 
-    rowHtml += `
+    // GRID-ANSICHT
+    const playersToShow = SEARCH_TERM 
+      ? ALL_PLAYERS.filter(player => 
+          player.toLowerCase().includes(SEARCH_TERM.toLowerCase()) ||
+          (byStorage[player] && byStorage[player].some(item => 
+            item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase())
+          ))
+        )
+      : ALL_PLAYERS;
+
+    playersToShow.forEach(player => {
+      const playerItems = byStorage[player] || [];
+      const hasMatchingItems = SEARCH_TERM 
+        ? playerItems.some(item => item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase()))
+        : true;
+
+      if (SEARCH_TERM && !hasMatchingItems && !player.toLowerCase().includes(SEARCH_TERM.toLowerCase())) {
+        return;
+      }
+
+      let rowHtml = `
+        <div class="player-row">
+          <div class="player-avatar">
+            <img src="https://mc-heads.net/body/${player}/256">
+            <div class="player-name">${player}</div>
+          </div>
+
+          <div class="player-items">
+      `;
+
+      if (playerItems.length === 0) {
+        rowHtml += `
+          <div class="no-items-message">
+            Keine Items vorhanden
+          </div>
+        `;
+      } else {
+        playerItems.forEach(item => {
+          const holder = usage.find(u => u.item_id === item.id);
+          let statusHtml = "";
+          let isMine = false;
+          let isHighlighted = SEARCH_TERM && item.name.toLowerCase().includes(SEARCH_TERM.toLowerCase());
+
+          if (!holder) {
+            statusHtml = `<div class="item-available">verfügbar</div>`;
+          } else {
+            const name = holder.profiles?.mc_name || "Unbekannt";
+            isMine = AUTH_METHOD === 'additional_password' 
+  ? (holder.profiles?.mc_name === CURRENT_MC_NAME) 
+  : (holder.user_id === CURRENT_USER_ID);
+
+            statusHtml = `
+              <div class="item-holder">
+                <img src="https://mc-heads.net/avatar/${name}/24">
+                <span>ausgeliehen von ${name}</span>
+                ${
+                  IS_ADMIN && !isMine
+                    ? `<span class="remove-holder"
+                            data-item="${item.id}"
+                            data-user="${holder.user_id}">✕</span>`
+                    : ""
+                }
+              </div>
+            `;
+          }
+
+          // Minimalistischer Entfernen-Button
+          const removeButtonHtml = IS_ADMIN 
+            ? `<button class="remove-item-btn admin-only" title="Item entfernen">×</button>`
+            : '';
+
+          // Edit-Button für Admins
+          const editButtonHtml = IS_ADMIN 
+            ? `<button class="edit-item-btn admin-only" title="Item bearbeiten">✏️</button>`
+            : '';
+
+          rowHtml += `
+            <div class="team-item ${isMine ? "mine" : ""} ${isHighlighted ? "item-highlight" : ""}"
+                 data-id="${item.id}"
+                 data-name="${item.name}"
+                 data-owner="${player}">
+              ${removeButtonHtml}
+              ${editButtonHtml}
+              <div class="item-name">${item.name}</div>
+              ${statusHtml}
+            </div>
+          `;
+        });
+      }
+
+      rowHtml += `
+          </div>
         </div>
-      </div>
-    `;
+      `;
 
-    container.innerHTML += rowHtml;
-  });
+      container.innerHTML += rowHtml;
+    });
 
-  if (playersToShow.length === 0) {
-    container.innerHTML = `
-      <div class="no-results">
-        Keine Spieler oder Items gefunden für "${SEARCH_TERM}"
-      </div>
-    `;
+    if (playersToShow.length === 0) {
+      container.innerHTML = `
+        <div class="no-results">
+          Keine Spieler oder Items gefunden für "${SEARCH_TERM}"
+        </div>
+      `;
+    }
+  } catch (error) {
+    console.error('Fehler in loadTeamItems:', error);
+    container.innerHTML = '<p class="no-items">Fehler beim Laden: ' + error.message + '</p>';
   }
 }
 
@@ -635,11 +703,15 @@ async function toggleItem(itemId) {
   const itemElement = document.querySelector(`[data-id="${itemId}"]`);
   const itemName = itemElement ? itemElement.dataset.name || itemElement.querySelector('.item-name').textContent : 'Item';
   
+  // Für additional_password Benutzer verwenden wir die mc_name statt user_id
+  const userIdField = 'user_id';
+  const userIdValue = CURRENT_USER_ID;
+  
   const { data: existing } = await window.supabaseClient
     .from("team_item_usage")
     .select("id")
     .eq("item_id", itemId)
-    .eq("user_id", CURRENT_USER_ID)
+    .eq(userIdField, userIdValue)
     .single();
 
   if (existing) {
@@ -651,21 +723,36 @@ async function toggleItem(itemId) {
     
     // Benachrichtigung
     if (window.showTeamNotification) {
-      window.showTeamNotification(CURRENT_MC_NAME, `"${itemName}" zurückgelegt`, "success");
+      window.showTeamNotification(
+        CURRENT_MC_NAME, // Spielername für den Kopf
+        `${CURRENT_MC_NAME} hat "${itemName}" zurückgelegt.`, // Nachricht
+        'info' // Typ
+      );
     }
+    
+    setTimeout(loadTeamItems, 200);
+    return;
   } else {
     // Item ausleihen
     await window.supabaseClient
       .from("team_item_usage")
-      .insert([{ item_id: itemId, user_id: CURRENT_USER_ID }]);
+      .insert([{ 
+        item_id: itemId, 
+        [userIdField]: userIdValue 
+      }]);
     
     // Benachrichtigung
     if (window.showTeamNotification) {
-      window.showTeamNotification(CURRENT_MC_NAME, `"${itemName}" ausgeliehen`, "success");
+      window.showTeamNotification(
+        CURRENT_MC_NAME, // Spielername für den Kopf
+        `${CURRENT_MC_NAME} hat "${itemName}" ausgeliehen.`,
+        'success' // Typ
+      );
     }
+    
+    setTimeout(loadTeamItems, 200);
+    return;
   }
-  // UI aktualisieren
-  await loadTeamItems();
 }
 
 // =========================
@@ -732,18 +819,38 @@ async function returnAllMyItems() {
     'Ja, zurücklegen',
     'Abbrechen',
     async () => {
-      const { data: { user } } = await window.supabaseClient.auth.getUser();
-      if (!user) return;
+      // Für additional_password Benutzer verwenden wir CURRENT_USER_ID statt auth.uid()
+      if (!CURRENT_USER_ID) return;
 
       await window.supabaseClient
         .from("team_item_usage")
         .delete()
-        .eq("user_id", user.id);
+        .eq("user_id", CURRENT_USER_ID);
 
       loadTeamItems();
       showNotification(`${CURRENT_MC_NAME} hat alle Items zurückgelegt.`, 'success');
     }
   );
+}
+
+// =========================
+// BENACHRICHTIGUNG ANZEIGEN
+// =========================
+function showMessage(text, type) {
+  const modalBody = document.querySelector('#addItemModal .modal-body');
+  if (!modalBody) return;
+  
+  const existingMessage = modalBody.querySelector('.message');
+  if (existingMessage) existingMessage.remove();
+  
+  const message = document.createElement('div');
+  message.className = `message ${type}`;
+  message.textContent = text;
+  
+  const form = document.getElementById('addItemForm');
+  if (form) {
+    form.appendChild(message);
+  }
 }
 
 // BENACHRICHTIGUNG ANZEIGEN
@@ -784,11 +891,28 @@ document.addEventListener("click", async (e) => {
   // ❌ Admin: fremdes Item freigeben
   const removeBtn = e.target.closest(".remove-holder");
   if (removeBtn) {
+    // Für additional_password Benutzer verwenden wir die mc_name statt user_id
+    const userIdField = 'user_id';
+    const userIdValue = removeBtn.dataset.user;
+    
     await window.supabaseClient
       .from("team_item_usage")
       .delete()
       .eq("item_id", removeBtn.dataset.item)
-      .eq("user_id", removeBtn.dataset.user);
+      .eq(userIdField, userIdValue);
+
+    // Benachrichtigung für Admin-Aktion
+    const itemElement = removeBtn.closest('.team-item');
+    const itemName = itemElement ? itemElement.dataset.name || itemElement.querySelector('.item-name').textContent : 'Item';
+    const playerName = removeBtn.dataset.player || 'Unbekannt';
+    
+    if (window.showTeamNotification) {
+      window.showTeamNotification(
+        CURRENT_MC_NAME, // Admin-Name für den Kopf
+        `${CURRENT_MC_NAME} hat "${itemName}" von ${playerName} zurückgelegt.`, // Nachricht
+        'info' // Typ
+      );
+    }
 
     setTimeout(loadTeamItems, 200);
     return;

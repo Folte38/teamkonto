@@ -1,32 +1,43 @@
 // =========================
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-document.addEventListener("DOMContentLoaded", function() {
-  window.supabaseClient.auth.getSession().then(({ data }) => {
-    if (!data.session) {
-      // Nicht eingeloggt - zeige Login-Seite
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('mainContent').style.display = 'none';
-    } else {
-      // Eingeloggt - prüfe Admin-Rechte
-      checkAdminAndInitialize(data.session.user.id);
+document.addEventListener("DOMContentLoaded", async function() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+  
+  // Navigation initialisieren wie bei index.html
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+  
+  if (navUser && navUsername && navAvatar) {
+    const currentUser = await window.getCurrentUser();
+    if (currentUser) {
+      navUsername.innerText = currentUser.mc_name;
+      navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+      navUser.style.display = "flex";
     }
-  });
+  }
+  
+  // Eingeloggt - prüfe Admin-Rechte
+  checkAdminAndInitialize();
 });
 
 // =========================
 // ADMIN-BERECHTIGUNG PRÜFEN
 // =========================
-async function checkAdminAndInitialize(userId) {
+async function checkAdminAndInitialize() {
   try {
-    const { data: profile } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name, role")
-      .eq("id", userId)
-      .single();
-
-    if (!profile) {
-      // Kein Profil - zeige Login-Seite
+    const currentUser = await window.getCurrentUser();
+    if (!currentUser) {
       document.getElementById('loginPage').style.display = 'flex';
       document.getElementById('mainContent').style.display = 'none';
       return;
@@ -37,7 +48,7 @@ async function checkAdminAndInitialize(userId) {
     document.getElementById('mainContent').style.display = 'block';
     
     // Admin-Status global speichern
-    window.IS_ADMIN = profile.role === "admin";
+    window.IS_ADMIN = currentUser.role === "admin";
     
     // App initialisieren
     initializeApp();
@@ -157,30 +168,37 @@ const STRAFEN = {
 };
 
 // =========================
-// PROFIL & NAV
+// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
 // =========================
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return;
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-  CURRENT_USER_ID = user.id;
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
 
-  const { data: profile } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
-  if (!profile) return;
-
-  CURRENT_MC_NAME = profile.mc_name;
   IS_ADMIN = profile.role === "admin";
 
   const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
   if (navUser) {
-    document.getElementById("navUsername").innerText = profile.mc_name;
-    document.getElementById("navAvatar").src =
-      `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    navUsername.innerText = profile.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
   }
 
@@ -869,5 +887,46 @@ document.addEventListener("DOMContentLoaded", function() {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", logout);
+  }
+  
+  // Passwort-Button Event Listener
+  const changePasswordBtn = document.getElementById("changePasswordBtn");
+  if (changePasswordBtn) {
+    changePasswordBtn.addEventListener("click", () => {
+      const modal = document.getElementById("passwordModal");
+      if (modal) {
+        modal.style.display = "flex";
+      }
+    });
+  }
+  
+  // Passwort-Modal Event Listener
+  const passwordModalClose = document.getElementById("passwordModalClose");
+  if (passwordModalClose) {
+    passwordModalClose.addEventListener("click", () => {
+      const modal = document.getElementById("passwordModal");
+      if (modal) {
+        modal.style.display = "none";
+      }
+    });
+  }
+  
+  const passwordCancelBtn = document.getElementById("passwordCancelBtn");
+  if (passwordCancelBtn) {
+    passwordCancelBtn.addEventListener("click", () => {
+      const modal = document.getElementById("passwordModal");
+      if (modal) {
+        modal.style.display = "none";
+      }
+    });
+  }
+  
+  // Passwort-Formular Event Listener
+  const passwordForm = document.getElementById("passwordForm");
+  if (passwordForm) {
+    passwordForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      // Passwort-Änderung wird von password-management.js gehandelt
+    });
   }
 });

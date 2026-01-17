@@ -1,27 +1,40 @@
 // =========================
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-document.addEventListener("DOMContentLoaded", function() {
-  window.supabaseClient.auth.getSession().then(({ data }) => {
-    if (!data.session) {
-      // Nicht eingeloggt -> Login-Seite anzeigen
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('mainContent').style.display = 'none';
-    } else {
-      // Eingeloggt -> Hauptinhalt anzeigen
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      initializeApp();
-      initializeServerStatus();
-      
-      // Login-Benachrichtigung prüfen (einmalig pro Session)
-      if (window.checkAndSendLoginNotification) {
-        setTimeout(() => {
-          window.checkAndSendLoginNotification();
-        }, 1000);
+document.addEventListener("DOMContentLoaded", async function() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+  } else {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    
+    // Navigation initialisieren wie bei index.html
+    const navUser = document.getElementById("navUser");
+    const navUsername = document.getElementById("navUsername");
+    const navAvatar = document.getElementById("navAvatar");
+    
+    if (navUser && navUsername && navAvatar) {
+      const currentUser = await window.getCurrentUser();
+      if (currentUser) {
+        navUsername.innerText = currentUser.mc_name;
+        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+        navUser.style.display = "flex";
       }
     }
-  });
+    
+    initializeApp();
+    initializeServerStatus();
+    
+    // Login-Benachrichtigung prüfen (einmalig pro Session)
+    if (window.checkAndSendLoginNotification) {
+      setTimeout(() => {
+        window.checkAndSendLoginNotification();
+      }, 1000);
+    }
+  }
 });
 
 // =========================
@@ -126,47 +139,50 @@ async function loadTotalMembers() {
 }
 
 // =========================
-// PROFIL & NAVIGATION
+// PROFIL & NAVIGATION - EXAKTE LOGIK VON INDEX.HTML
 // =========================
 async function loadProfile() {
-  try {
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) return;
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-    CURRENT_USER_ID = user.id;
-
-    const { data: profile } = await window.supabaseClient
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
       .from("profiles")
-      .select("mc_name")
-      .eq("id", user.id)
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
       .single();
 
-    if (!profile) return;
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
-    CURRENT_MC_NAME = profile.mc_name;
+  IS_ADMIN = profile.role === "admin";
 
-    // Navigation anzeigen
-    const navUser = document.getElementById("navUser");
-    if (navUser) {
-      document.getElementById("navUsername").innerText = profile.mc_name;
-      document.getElementById("navAvatar").src =
-        "https://mc-heads.net/avatar/" + profile.mc_name + "/64";
-      navUser.style.display = "flex";
-    }
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
 
-    // Formular vorausfüllen
-    const creditUser = document.getElementById("creditUser");
-    if (creditUser) {
-      creditUser.value = profile.mc_name;
-    }
+  if (navUser) {
+    navUsername.innerText = profile.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    navUser.style.display = "flex";
+  }
 
-    // Logout-Button anzeigen
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) {
-      logoutBtn.style.display = "block";
-    }
-  } catch (error) {
-    console.error("Fehler beim Laden des Profils:", error);
+  // Formular vorausfüllen
+  const creditUser = document.getElementById("creditUser");
+  if (creditUser) {
+    creditUser.value = profile.mc_name;
+  }
+
+  // Logout-Button anzeigen
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.style.display = "block";
   }
 }
 

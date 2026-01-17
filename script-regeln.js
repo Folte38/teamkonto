@@ -1,27 +1,40 @@
 // =========================
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
-document.addEventListener("DOMContentLoaded", function() {
-  window.supabaseClient.auth.getSession().then(({ data }) => {
-    if (!data.session) {
-      // Nicht eingeloggt - zeige Login-Seite
-      document.getElementById('loginPage').style.display = 'flex';
-      document.getElementById('mainContent').style.display = 'none';
-    } else {
-      // Eingeloggt - zeige Inhalt
-      document.getElementById('loginPage').style.display = 'none';
-      document.getElementById('mainContent').style.display = 'block';
-      initializeApp();
-      initializeServerStatus();
-      
-      // Login-Benachrichtigung prüfen (einmalig pro Session)
-      if (window.checkAndSendLoginNotification) {
-        setTimeout(() => {
-          window.checkAndSendLoginNotification();
-        }, 1000);
+document.addEventListener("DOMContentLoaded", async function() {
+  const auth = await window.checkAuthentication();
+  
+  if (!auth.authenticated) {
+    document.getElementById('loginPage').style.display = 'flex';
+    document.getElementById('mainContent').style.display = 'none';
+  } else {
+    document.getElementById('loginPage').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    
+    // Navigation initialisieren wie bei index.html
+    const navUser = document.getElementById("navUser");
+    const navUsername = document.getElementById("navUsername");
+    const navAvatar = document.getElementById("navAvatar");
+    
+    if (navUser && navUsername && navAvatar) {
+      const currentUser = await window.getCurrentUser();
+      if (currentUser) {
+        navUsername.innerText = currentUser.mc_name;
+        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+        navUser.style.display = "flex";
       }
     }
-  });
+    
+    initializeApp();
+    initializeServerStatus();
+    
+    // Login-Benachrichtigung prüfen (einmalig pro Session)
+    if (window.checkAndSendLoginNotification) {
+      setTimeout(() => {
+        window.checkAndSendLoginNotification();
+      }, 1000);
+    }
+  }
 });
 
 // =========================
@@ -35,31 +48,39 @@ function initializeApp() {
 }
 
 // =========================
-// PROFIL & NAV
+// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
 // =========================
 async function loadProfile() {
-  const { data: { user } } = await window.supabaseClient.auth.getUser();
-  if (!user) return Promise.resolve();
+  const currentUser = await window.getCurrentUser();
+  if (!currentUser) return Promise.resolve();
 
-  const { data: profile, error } = await window.supabaseClient
-    .from("profiles")
-    .select("mc_name, role")
-    .eq("id", user.id)
-    .single();
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - altes Verhalten
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
 
-  if (error || !profile) return Promise.resolve();
+    if (error || !profileData) return Promise.resolve();
+    profile = profileData;
+  }
 
   IS_ADMIN = profile.role === "admin";
-  CURRENT_USER_ID = user.id;
-  CURRENT_MC_NAME = profile.mc_name;
 
   const navUser = document.getElementById("navUser");
   const navUsername = document.getElementById("navUsername");
   const navAvatar = document.getElementById("navAvatar");
 
-  if (navUser) navUser.style.display = "flex";
-  if (navUsername) navUsername.textContent = profile.mc_name;
-  if (navAvatar) navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+  if (navUser) {
+    navUsername.innerText = profile.mc_name;
+    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    navUser.style.display = "flex";
+  }
 }
 
 // =========================
