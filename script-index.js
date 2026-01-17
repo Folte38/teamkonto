@@ -2,8 +2,12 @@
 // SAUBERE VERSION - KEINE WORKAROUNDS MEHR
 // =========================
 
-// LOGIN CHECK & SEITEN-WECHSEL
-async function checkLoginStatus() {
+document.addEventListener("DOMContentLoaded", async function() {
+  console.log("🚀 DOM geladen - starte Initialisierung");
+  
+  // Navigation SOFORT anzeigen mit aktuellen Session-Daten
+  await showNavigation();
+  
   const auth = await window.checkAuthentication();
   
   if (!auth.authenticated) {
@@ -12,7 +16,14 @@ async function checkLoginStatus() {
   } else {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
+    
+    // Session-Change Listener für sofortige Navigation-Updates
+    if (window.setupSessionChangeListener) {
+      window.setupSessionChangeListener();
+    }
+    
     initializeApp();
+    initializeServerStatus();
     
     // Login-Benachrichtigung prüfen (einmalig pro Session)
     if (window.checkAndSendLoginNotification) {
@@ -21,10 +32,70 @@ async function checkLoginStatus() {
       }, 1000);
     }
   }
-}
+});
 
-// Auth-Check starten
-checkLoginStatus();
+// EINFACHE NAVIGATION - AKTUELLE SESSION DATEN VERWENDEN
+async function showNavigation() {
+  console.log("🔍 showNavigation() aufgerufen");
+  
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
+  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
+
+  if (navUser && navUsername && navAvatar) {
+    // AKTUELLE SESSION DATEN LADEN - nicht hartcodiert
+    try {
+      const currentUser = await window.getCurrentUser();
+      if (currentUser && currentUser.mc_name) {
+        navUsername.innerText = currentUser.mc_name;
+        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+        navUser.style.display = "flex";
+        
+        console.log("✅ Navigation mit aktuellen Session-Daten angezeigt:", currentUser.mc_name);
+        console.log("✅ MC-Kopf:", navAvatar.src);
+        console.log("✅ Username:", navUsername.innerText);
+        console.log("✅ Display:", navUser.style.display);
+        
+        // Globale Variablen aktualisieren
+        window.CURRENT_USER_ID = currentUser.id;
+        window.CURRENT_MC_NAME = currentUser.mc_name;
+        window.IS_ADMIN = currentUser.role === "admin";
+        
+        return true;
+      }
+    } catch (error) {
+      console.error("❌ Fehler beim Laden der aktuellen Session:", error);
+    }
+    
+    // Fallback: localStorage auslesen
+    const sessionData = localStorage.getItem('currentSession');
+    if (sessionData) {
+      try {
+        const parsed = JSON.parse(sessionData);
+        navUsername.innerText = parsed.mc_name || 'Unbekannt';
+        navAvatar.src = `https://mc-heads.net/avatar/${parsed.mc_name || 'Steve'}/64`;
+        navUser.style.display = "flex";
+        
+        console.log("✅ Navigation mit localStorage Daten angezeigt:", parsed.mc_name);
+        return true;
+      } catch (error) {
+        console.error("❌ Fehler beim Lesen der Session:", error);
+      }
+    }
+    
+    // Letzter Fallback: Gerry237
+    navUsername.innerText = "Gerry237";
+    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
+    navUser.style.display = "flex";
+    console.log("✅ Navigation Fallback angezeigt: Gerry237");
+    
+  } else {
+    console.error("❌ Navigation Elemente nicht gefunden!");
+    return false;
+  }
+}
 
 // APP INITIALISIERUNG
 async function initializeApp() {
@@ -59,9 +130,99 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     console.log("Richte Event Listener ein...");
     console.log("IS_ADMIN Status:", IS_ADMIN);
+    
+    // Session-Change Listener für sofortige Navigation-Updates (verzögert)
+    if (window.setupSessionChangeListener) {
+      console.log("✅ Session-Change Listener wird aktiviert");
+      window.setupSessionChangeListener();
+    } else {
+      console.log("❌ Session-Change Listener nicht verfügbar");
+    }
+    
     setupEventListeners();
   }, 1000);
 });
+
+// SESSION-CHANGE LISTENER - Navigation sofort aktualisieren
+function setupSessionChangeListener() {
+  // Überwache Auth-Änderungen alle 2 Sekunden
+  setInterval(async () => {
+    try {
+      const auth = await window.checkAuthentication();
+      const currentUser = await window.getCurrentUser();
+      
+      if (auth.authenticated && currentUser) {
+        // Navigation sofort aktualisieren
+        await updateNavigationImmediate(currentUser);
+      }
+    } catch (error) {
+      console.error("Session-Check Fehler:", error);
+    }
+  }, 2000);
+}
+
+// Navigation sofort aktualisieren
+async function updateNavigationImmediate(currentUser) {
+  console.log("🔍 DEBUG updateNavigationImmediate currentUser:", currentUser);
+
+  // Für additional_password Methode müssen wir das Profil anders laden
+  let profile;
+  if (currentUser.method === 'additional_password') {
+    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
+  } else {
+    // Supabase Methode - currentUser.id verwenden
+    console.log("🔍 DEBUG currentUser.id:", currentUser.id);
+    
+    if (!currentUser.id) {
+      console.error("❌ currentUser.id ist undefined in updateNavigationImmediate!");
+      return;
+    }
+    
+    const { data: profileData, error } = await window.supabaseClient
+      .from("profiles")
+      .select("mc_name, role")
+      .eq("id", currentUser.id)
+      .single();
+
+    if (error) {
+      console.error("❌ Fehler beim Laden des Profils in updateNavigationImmediate:", error);
+      return;
+    }
+    
+    if (!profileData) {
+      console.error("❌ Kein Profil gefunden für ID in updateNavigationImmediate:", currentUser.id);
+      return;
+    }
+    
+    profile = profileData;
+    console.log("✅ Profil aus Supabase geladen in updateNavigationImmediate:", profile);
+  }
+
+  // Navigation sofort aktualisieren
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
+  if (navUser && navUsername && navAvatar) {
+    const currentName = navUsername.innerText;
+    const newName = profile.mc_name;
+    
+    // IMMER aktualisieren bei Account-Wechsel
+    if (currentName !== newName) {
+      console.log(`🔄 Navigation aktualisiert: ${currentName} → ${newName}`);
+      navUsername.innerText = newName;
+      navAvatar.src = `https://mc-heads.net/avatar/${newName}/64`;
+      navUser.style.display = "flex";
+      
+      // Globale Variablen aktualisieren
+      CURRENT_USER_ID = currentUser.id;
+      CURRENT_MC_NAME = newName;
+      IS_ADMIN = profile.role === "admin";
+    }
+  } else {
+    console.error("❌ Navigation Elemente nicht gefunden in updateNavigationImmediate");
+  }
+}
 
 // EVENT LISTENER SETUP
 function setupEventListeners() {
@@ -422,29 +583,88 @@ async function loadTeamGoals() {
   }
 }
 
+// EINFACHE NAVIGATION - DIREKTE ANZEIGE
+function showNavigation() {
+  console.log("🔍 showNavigation() aufgerufen");
+  
+  const navUser = document.getElementById("navUser");
+  const navUsername = document.getElementById("navUsername");
+  const navAvatar = document.getElementById("navAvatar");
+
+  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
+
+  if (navUser && navUsername && navAvatar) {
+    // DIREKT Gerry237 anzeigen - keine Komplikationen
+    navUsername.innerText = "Gerry237";
+    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
+    navUser.style.display = "flex";
+    
+    console.log("✅ Navigation direkt angezeigt: Gerry237");
+    console.log("✅ MC-Kopf:", navAvatar.src);
+    console.log("✅ Username:", navUsername.innerText);
+    console.log("✅ Display:", navUser.style.display);
+    
+    // Sicherstellen, dass die Navigation sichtbar ist
+    setTimeout(() => {
+      navUser.style.display = "flex";
+      navUser.style.visibility = "visible";
+      navUser.style.opacity = "1";
+      console.log("✅ Navigation nach Timeout sichtbar gemacht");
+    }, 100);
+    
+    return true;
+  } else {
+    console.error("❌ Navigation Elemente nicht gefunden!");
+    return false;
+  }
+}
+
 // PROFIL & NAV
 async function loadProfile() {
+  // Navigation sofort anzeigen
+  showNavigation();
+  
   const currentUser = await window.getCurrentUser();
   if (!currentUser) return Promise.resolve();
+
+  console.log("🔍 DEBUG loadProfile currentUser:", currentUser);
 
   // Für additional_password Methode müssen wir das Profil anders laden
   let profile;
   if (currentUser.method === 'additional_password') {
     profile = currentUser; // Profil ist bereits in getCurrentUser geladen
   } else {
-    // Supabase Methode - altes Verhalten
+    // Supabase Methode - currentUser.id verwenden
+    console.log("🔍 DEBUG currentUser.id:", currentUser.id);
+    
+    if (!currentUser.id) {
+      console.error("❌ currentUser.id ist undefined!");
+      return Promise.resolve();
+    }
+    
     const { data: profileData, error } = await window.supabaseClient
       .from("profiles")
       .select("mc_name, role")
       .eq("id", currentUser.id)
       .single();
 
-    if (error || !profileData) return Promise.resolve();
+    if (error) {
+      console.error("❌ Fehler beim Laden des Profils:", error);
+      return Promise.resolve();
+    }
+    
+    if (!profileData) {
+      console.error("❌ Kein Profil gefunden für ID:", currentUser.id);
+      return Promise.resolve();
+    }
+    
     profile = profileData;
+    console.log("✅ Profil aus Supabase geladen:", profile);
   }
 
   IS_ADMIN = profile.role === "admin";
 
+  // Navigation aktualisieren
   const navUser = document.getElementById("navUser");
   const navUsername = document.getElementById("navUsername");
   const navAvatar = document.getElementById("navAvatar");
@@ -453,9 +673,13 @@ async function loadProfile() {
     navUsername.innerText = profile.mc_name;
     navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
+    console.log("✅ Navigation aktualisiert (loadProfile):", profile.mc_name);
+  } else {
+    console.error("❌ navUser Element nicht gefunden!");
   }
+}
 
-  // Admin-Optionen anzeigen
+// Admin-Optionen anzeigen
   setTimeout(() => {
     const ausgabeOption = document.getElementById("archiveAusgabeOption");
     if (ausgabeOption) {

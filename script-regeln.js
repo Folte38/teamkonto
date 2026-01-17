@@ -25,6 +25,11 @@ document.addEventListener("DOMContentLoaded", async function() {
       }
     }
     
+    // Session-Change Listener für sofortige Navigation-Updates
+    if (window.setupSessionChangeListener) {
+      window.setupSessionChangeListener();
+    }
+    
     initializeApp();
     initializeServerStatus();
     
@@ -70,8 +75,18 @@ async function loadProfile() {
     profile = profileData;
   }
 
+  // GLOBALE VARIABLEN SETZEN - WICHTIG FÜR API-AUFRUFE
+  CURRENT_USER_ID = currentUser.id;
+  CURRENT_MC_NAME = profile.mc_name;
   IS_ADMIN = profile.role === "admin";
 
+  console.log("✅ loadProfile(): Globale Variablen gesetzt:", {
+    CURRENT_USER_ID,
+    CURRENT_MC_NAME,
+    IS_ADMIN
+  });
+
+  // Navigation IMMER aktualisieren bei Benutzerwechsel
   const navUser = document.getElementById("navUser");
   const navUsername = document.getElementById("navUsername");
   const navAvatar = document.getElementById("navAvatar");

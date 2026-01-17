@@ -99,6 +99,16 @@ async function login() {
         }));
         
         console.log("Login erfolgreich mit additional_password!");
+        
+        // Login-Benachrichtigung anzeigen
+        if (window.showTeamNotification) {
+          window.showTeamNotification(
+            profile.mc_name,
+            `${profile.mc_name} hat sich angemeldet.`,
+            'success'
+          );
+        }
+        
         window.location.href = "index.html";
         return;
       }
@@ -127,6 +137,16 @@ async function login() {
 
     // ✅ Erfolgreich mit Supabase eingeloggt
     console.log("Login erfolgreich mit Supabase!");
+    
+    // Login-Benachrichtigung anzeigen
+    if (window.showTeamNotification) {
+      window.showTeamNotification(
+        mcName,
+        `${mcName} hat sich angemeldet.`,
+        'success'
+      );
+    }
+    
     window.location.href = "index.html";
 
   } catch (error) {

@@ -143,6 +143,77 @@ let notificationsChannel = null;
 let currentUserId = null;
 let currentMcName = null;
 
+// Aktuellen Benutzer sofort aktualisieren (für Session-Change Manager)
+async function updateCurrentUser() {
+  console.log("🔄 updateCurrentUser() aufgerufen - sofortige Aktualisierung");
+  
+  // Zuerst versuchen über auth-helper.js
+  if (window.getCurrentUser) {
+    try {
+      const currentUser = await window.getCurrentUser();
+      console.log("🔍 DEBUG: currentUser von auth-helper:", currentUser);
+      
+      if (currentUser) {
+        currentUserId = currentUser.id;
+        
+        // Für additional_password Methode mc_name direkt verwenden
+        if (currentUser.method === 'additional_password') {
+          currentMcName = currentUser.mc_name;
+        } else {
+          // Für Supabase Methode mc_name aus Profil laden
+          const { data: profile } = await window.supabaseClient
+            .from("profiles")
+            .select("mc_name")
+            .eq("id", currentUser.id)
+            .single();
+          
+          if (profile) {
+            currentMcName = profile.mc_name;
+          }
+        }
+        
+        console.log("✅ DEBUG: Benutzer sofort aktualisiert:", currentMcName);
+        return;
+      }
+    } catch (error) {
+      console.error("❌ DEBUG: Fehler bei auth-helper:", error);
+    }
+  }
+  
+  // Fallback: Direkt über Supabase
+  if (!window.supabaseClient) {
+    console.error("❌ DEBUG: Supabase Client nicht verfügbar");
+    return;
+  }
+  
+  try {
+    const { data: { user } } = await window.supabaseClient.auth.getUser();
+    console.log("🔍 DEBUG: Supabase user:", user);
+    
+    if (user) {
+      currentUserId = user.id;
+      
+      // MC-Name aus Profil laden
+      const { data: profile } = await window.supabaseClient
+        .from("profiles")
+        .select("mc_name")
+        .eq("id", user.id)
+        .single();
+      
+      if (profile) {
+        currentMcName = profile.mc_name;
+        console.log("✅ DEBUG: Profil sofort aktualisiert:", currentMcName);
+      } else {
+        console.error("❌ DEBUG: Profil nicht gefunden für user:", user.id);
+      }
+    } else {
+      console.error("❌ DEBUG: Kein Supabase user gefunden");
+    }
+  } catch (error) {
+    console.error("❌ DEBUG: Fehler beim Laden des Benutzers:", error);
+  }
+}
+
 // Aktuellen Benutzer laden (beide Methoden) - EINFACHE LÖSUNG
 async function loadCurrentUser() {
   console.log("🔍 DEBUG: loadCurrentUser() aufgerufen");
@@ -155,7 +226,23 @@ async function loadCurrentUser() {
       
       if (currentUser) {
         currentUserId = currentUser.id;
-        currentMcName = currentUser.mc_name;
+        
+        // Für additional_password Methode mc_name direkt verwenden
+        if (currentUser.method === 'additional_password') {
+          currentMcName = currentUser.mc_name;
+        } else {
+          // Für Supabase Methode mc_name aus Profil laden
+          const { data: profile } = await window.supabaseClient
+            .from("profiles")
+            .select("mc_name")
+            .eq("id", currentUser.id)
+            .single();
+          
+          if (profile) {
+            currentMcName = profile.mc_name;
+          }
+        }
+        
         console.log("✅ DEBUG: Benutzer geladen:", currentMcName);
         return;
       }
@@ -328,20 +415,52 @@ function setupRealtimeNotifications() {
 
 // Login-Benachrichtigung senden
 async function sendLoginNotification() {
-  if (!window.supabaseClient || !currentMcName) return;
+  if (!window.supabaseClient) return;
   
   try {
-    // Benachrichtigung in eine temporäre Tabelle schreiben oder direkt broadcasten
-    // Da wir keine notifications-Tabelle haben, verwenden wir einen Broadcast-Channel
-    const channel = window.supabaseClient.channel('login-broadcast');
+    // Aktuellen Benutzer über auth-helper.js holen
+    const currentUser = await window.getCurrentUser();
+    if (!currentUser) {
+      console.log('Kein eingeloggter Benutzer gefunden');
+      return;
+    }
+
+    console.log('Versuche Login-Benachrichtigung zu senden für:', currentUser.mc_name);
+
+    // Warten bis Channel bereit ist, dann senden
+    const maxAttempts = 30;
+    let attempts = 0;
     
-    await channel.send({
-      type: 'broadcast',
-      event: 'login',
-      payload: { mc_name: currentMcName }
-    });
+    const trySend = () => {
+      if (globalLoginChannelReady && globalLoginChannel) {
+        try {
+          const result = globalLoginChannel.send({
+            type: 'broadcast',
+            event: 'login',
+            payload: { mc_name: currentUser.mc_name, user_id: currentUser.id }
+          });
+          console.log('✅ Login-Benachrichtigung gesendet:', currentUser.mc_name, result);
+        } catch (error) {
+          console.error('Fehler beim Senden der Login-Benachrichtigung:', error);
+          if (attempts < maxAttempts) {
+            attempts++;
+            setTimeout(trySend, 300);
+          }
+        }
+      } else if (attempts < maxAttempts) {
+        attempts++;
+        if (attempts % 5 === 0) {
+          console.log(`Warte auf Login-Channel... (Versuch ${attempts}/${maxAttempts})`);
+        }
+        setTimeout(trySend, 200);
+      } else {
+        console.warn('⚠️ Login-Benachrichtigung konnte nicht gesendet werden - Channel nicht bereit nach', maxAttempts, 'Versuchen');
+      }
+    };
+    
+    trySend();
   } catch (error) {
-    console.error('Fehler beim Senden der Login-Benachrichtigung:', error);
+    console.error('Unerwarteter Fehler beim Senden der Login-Benachrichtigung:', error);
   }
 }
 
@@ -362,21 +481,16 @@ async function checkAndSendLoginNotification() {
   if (!window.supabaseClient) return;
   
   try {
-    const { data: { user } } = await window.supabaseClient.auth.getUser();
-    if (!user) {
+    // Aktuellen Benutzer über auth-helper.js holen
+    const currentUser = await window.getCurrentUser();
+    if (!currentUser) {
       loginNotificationSent = false;
       currentSessionId = null;
       sessionInitialized = false;
       return;
     }
 
-    const { data: profile } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile) return;
+    console.log('checkAndSendLoginNotification - aktueller Benutzer:', currentUser.mc_name);
 
     // Prüfen ob dies eine neue Session ist
     const newSessionId = generateSessionId();
@@ -388,7 +502,7 @@ async function checkAndSendLoginNotification() {
 
     // Nur senden wenn noch nicht gesendet in dieser Session UND Session noch nicht initialisiert
     if (!loginNotificationSent && !sessionInitialized) {
-      console.log('Sende einmalige Login-Benachrichtigung für:', profile.mc_name);
+      console.log('Sende einmalige Login-Benachrichtigung für:', currentUser.mc_name);
       await sendGlobalLoginNotification();
       loginNotificationSent = true;
       sessionInitialized = true; // Session als initialisiert markieren
@@ -516,24 +630,14 @@ async function sendGlobalLoginNotification() {
   }
   
   try {
-    const { data: { user }, error: userError } = await window.supabaseClient.auth.getUser();
-    if (userError || !user) {
+    // Aktuellen Benutzer über auth-helper.js holen
+    const currentUser = await window.getCurrentUser();
+    if (!currentUser) {
       console.log('Kein eingeloggter Benutzer gefunden');
       return;
     }
 
-    const { data: profile, error: profileError } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name")
-      .eq("id", user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.warn('Profil nicht gefunden:', profileError);
-      return;
-    }
-
-    console.log('Versuche Login-Benachrichtigung zu senden für:', profile.mc_name);
+    console.log('Versuche Login-Benachrichtigung zu senden für:', currentUser.mc_name);
 
     // Warten bis Channel bereit ist, dann senden
     const maxAttempts = 30;
@@ -545,9 +649,9 @@ async function sendGlobalLoginNotification() {
           const result = globalLoginChannel.send({
             type: 'broadcast',
             event: 'login',
-            payload: { mc_name: profile.mc_name, user_id: user.id }
+            payload: { mc_name: currentUser.mc_name, user_id: currentUser.id }
           });
-          console.log('✅ Login-Benachrichtigung gesendet:', profile.mc_name, result);
+          console.log('✅ Login-Benachrichtigung gesendet:', currentUser.mc_name, result);
         } catch (error) {
           console.error('Fehler beim Senden der Login-Benachrichtigung:', error);
           if (attempts < maxAttempts) {
@@ -640,6 +744,7 @@ async function sendGlobalLogoutNotification() {
 // Globale Funktionen exportieren
 window.showTeamNotification = showTeamNotification;
 window.setupRealtimeNotifications = setupRealtimeNotifications;
+window.updateCurrentUser = updateCurrentUser;
 window.loadCurrentUser = loadCurrentUser;
 window.setupGlobalLoginNotifications = setupGlobalLoginNotifications;
 window.sendGlobalLoginNotification = sendGlobalLoginNotification;
