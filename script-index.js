@@ -2,12 +2,8 @@
 // SAUBERE VERSION - KEINE WORKAROUNDS MEHR
 // =========================
 
-document.addEventListener("DOMContentLoaded", async function() {
-  console.log("🚀 DOM geladen - starte Initialisierung");
-  
-  // Navigation SOFORT anzeigen mit aktuellen Session-Daten
-  await showNavigation();
-  
+// LOGIN CHECK & SEITEN-WECHSEL
+async function checkLoginStatus() {
   const auth = await window.checkAuthentication();
   
   if (!auth.authenticated) {
@@ -16,14 +12,7 @@ document.addEventListener("DOMContentLoaded", async function() {
   } else {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
     initializeApp();
-    initializeServerStatus();
     
     // Login-Benachrichtigung prüfen (einmalig pro Session)
     if (window.checkAndSendLoginNotification) {
@@ -32,94 +21,21 @@ document.addEventListener("DOMContentLoaded", async function() {
       }, 1000);
     }
   }
-});
-
-// EINFACHE NAVIGATION - AKTUELLE SESSION DATEN VERWENDEN
-async function showNavigation() {
-  console.log("🔍 showNavigation() aufgerufen");
-  
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
-
-  if (navUser && navUsername && navAvatar) {
-    // AKTUELLE SESSION DATEN LADEN - nicht hartcodiert
-    try {
-      const currentUser = await window.getCurrentUser();
-      if (currentUser && currentUser.mc_name) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit aktuellen Session-Daten angezeigt:", currentUser.mc_name);
-        console.log("✅ MC-Kopf:", navAvatar.src);
-        console.log("✅ Username:", navUsername.innerText);
-        console.log("✅ Display:", navUser.style.display);
-        
-        // Globale Variablen aktualisieren
-        window.CURRENT_USER_ID = currentUser.id;
-        window.CURRENT_MC_NAME = currentUser.mc_name;
-        window.IS_ADMIN = currentUser.role === "admin";
-        
-        return true;
-      }
-    } catch (error) {
-      console.error("❌ Fehler beim Laden der aktuellen Session:", error);
-    }
-    
-    // Fallback: localStorage auslesen
-    const sessionData = localStorage.getItem('currentSession');
-    if (sessionData) {
-      try {
-        const parsed = JSON.parse(sessionData);
-        navUsername.innerText = parsed.mc_name || 'Unbekannt';
-        navAvatar.src = `https://mc-heads.net/avatar/${parsed.mc_name || 'Steve'}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit localStorage Daten angezeigt:", parsed.mc_name);
-        return true;
-      } catch (error) {
-        console.error("❌ Fehler beim Lesen der Session:", error);
-      }
-    }
-    
-    // Letzter Fallback: Gerry237
-    navUsername.innerText = "Gerry237";
-    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
-    navUser.style.display = "flex";
-    console.log("✅ Navigation Fallback angezeigt: Gerry237");
-    
-  } else {
-    console.error("❌ Navigation Elemente nicht gefunden!");
-    return false;
-  }
 }
 
+// Auth-Check starten
+checkLoginStatus();
+
 // APP INITIALISIERUNG
-async function initializeApp() {
-  try {
-    console.log("Initialisiere App...");
-    
-    // Warte auf Profil-Ladung
-    await loadProfile();
-    console.log("Profil geladen, lade restliche Komponenten...");
-    
-    // Lade restliche Komponenten nacheinander
-    await loadWeeks();
-    await loadPaymentsFromDB();
-    await loadPlayerPaymentStatus();
-    await loadArchive();
-    await loadTeamGoals();
-    
+function initializeApp() {
+  loadProfile().then(() => {
+    loadWeeks();
+    loadPaymentsFromDB();
+    loadPlayerPaymentStatus();
+    loadArchive();
+    loadTeamGoals();
     // Event Listener werden nach DOM-Laden eingerichtet
-    setupEventListeners();
-    console.log("App-Initialisierung abgeschlossen");
-    
-  } catch (error) {
-    console.error("Fehler bei App-Initialisierung:", error);
-  }
+  });
 }
 
 // Event Listener nach DOM-Laden einrichten
@@ -130,99 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
   setTimeout(() => {
     console.log("Richte Event Listener ein...");
     console.log("IS_ADMIN Status:", IS_ADMIN);
-    
-    // Session-Change Listener für sofortige Navigation-Updates (verzögert)
-    if (window.setupSessionChangeListener) {
-      console.log("✅ Session-Change Listener wird aktiviert");
-      window.setupSessionChangeListener();
-    } else {
-      console.log("❌ Session-Change Listener nicht verfügbar");
-    }
-    
     setupEventListeners();
   }, 1000);
 });
-
-// SESSION-CHANGE LISTENER - Navigation sofort aktualisieren
-function setupSessionChangeListener() {
-  // Überwache Auth-Änderungen alle 2 Sekunden
-  setInterval(async () => {
-    try {
-      const auth = await window.checkAuthentication();
-      const currentUser = await window.getCurrentUser();
-      
-      if (auth.authenticated && currentUser) {
-        // Navigation sofort aktualisieren
-        await updateNavigationImmediate(currentUser);
-      }
-    } catch (error) {
-      console.error("Session-Check Fehler:", error);
-    }
-  }, 2000);
-}
-
-// Navigation sofort aktualisieren
-async function updateNavigationImmediate(currentUser) {
-  console.log("🔍 DEBUG updateNavigationImmediate currentUser:", currentUser);
-
-  // Für additional_password Methode müssen wir das Profil anders laden
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-  } else {
-    // Supabase Methode - currentUser.id verwenden
-    console.log("🔍 DEBUG currentUser.id:", currentUser.id);
-    
-    if (!currentUser.id) {
-      console.error("❌ currentUser.id ist undefined in updateNavigationImmediate!");
-      return;
-    }
-    
-    const { data: profileData, error } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name, role")
-      .eq("id", currentUser.id)
-      .single();
-
-    if (error) {
-      console.error("❌ Fehler beim Laden des Profils in updateNavigationImmediate:", error);
-      return;
-    }
-    
-    if (!profileData) {
-      console.error("❌ Kein Profil gefunden für ID in updateNavigationImmediate:", currentUser.id);
-      return;
-    }
-    
-    profile = profileData;
-    console.log("✅ Profil aus Supabase geladen in updateNavigationImmediate:", profile);
-  }
-
-  // Navigation sofort aktualisieren
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  if (navUser && navUsername && navAvatar) {
-    const currentName = navUsername.innerText;
-    const newName = profile.mc_name;
-    
-    // IMMER aktualisieren bei Account-Wechsel
-    if (currentName !== newName) {
-      console.log(`🔄 Navigation aktualisiert: ${currentName} → ${newName}`);
-      navUsername.innerText = newName;
-      navAvatar.src = `https://mc-heads.net/avatar/${newName}/64`;
-      navUser.style.display = "flex";
-      
-      // Globale Variablen aktualisieren
-      CURRENT_USER_ID = currentUser.id;
-      CURRENT_MC_NAME = newName;
-      IS_ADMIN = profile.role === "admin";
-    }
-  } else {
-    console.error("❌ Navigation Elemente nicht gefunden in updateNavigationImmediate");
-  }
-}
 
 // EVENT LISTENER SETUP
 function setupEventListeners() {
@@ -291,9 +117,6 @@ function setupEventListeners() {
     try {
       const playerBox = e.target.closest(".player.clickable");
       console.log("Spieler Click:", playerBox, "IS_ADMIN:", IS_ADMIN);
-      
-      // Globale Variable für andere Seiten verfügbar machen
-      window.IS_ADMIN = IS_ADMIN;
       
       if (playerBox && IS_ADMIN) {
         const playerId = playerBox.dataset.playerId;
@@ -514,7 +337,7 @@ const START_BALANCE = 7000000;
 const WEEKLY_CONTRIBUTION = 2000000;
 const CURRENT_WEEK = getCurrentWeek();
 
-let SELECTED_WEEK = null; // Start mit null, dann setzen wenn select.value existiert
+let SELECTED_WEEK = CURRENT_WEEK;
 let IS_ADMIN = false;
 let EDITING_GOAL_ID = null;
 
@@ -583,88 +406,29 @@ async function loadTeamGoals() {
   }
 }
 
-// EINFACHE NAVIGATION - DIREKTE ANZEIGE
-function showNavigation() {
-  console.log("🔍 showNavigation() aufgerufen");
-  
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
-
-  if (navUser && navUsername && navAvatar) {
-    // DIREKT Gerry237 anzeigen - keine Komplikationen
-    navUsername.innerText = "Gerry237";
-    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
-    navUser.style.display = "flex";
-    
-    console.log("✅ Navigation direkt angezeigt: Gerry237");
-    console.log("✅ MC-Kopf:", navAvatar.src);
-    console.log("✅ Username:", navUsername.innerText);
-    console.log("✅ Display:", navUser.style.display);
-    
-    // Sicherstellen, dass die Navigation sichtbar ist
-    setTimeout(() => {
-      navUser.style.display = "flex";
-      navUser.style.visibility = "visible";
-      navUser.style.opacity = "1";
-      console.log("✅ Navigation nach Timeout sichtbar gemacht");
-    }, 100);
-    
-    return true;
-  } else {
-    console.error("❌ Navigation Elemente nicht gefunden!");
-    return false;
-  }
-}
-
 // PROFIL & NAV
 async function loadProfile() {
-  // Navigation sofort anzeigen
-  showNavigation();
-  
   const currentUser = await window.getCurrentUser();
   if (!currentUser) return Promise.resolve();
-
-  console.log("🔍 DEBUG loadProfile currentUser:", currentUser);
 
   // Für additional_password Methode müssen wir das Profil anders laden
   let profile;
   if (currentUser.method === 'additional_password') {
     profile = currentUser; // Profil ist bereits in getCurrentUser geladen
   } else {
-    // Supabase Methode - currentUser.id verwenden
-    console.log("🔍 DEBUG currentUser.id:", currentUser.id);
-    
-    if (!currentUser.id) {
-      console.error("❌ currentUser.id ist undefined!");
-      return Promise.resolve();
-    }
-    
+    // Supabase Methode - altes Verhalten
     const { data: profileData, error } = await window.supabaseClient
       .from("profiles")
       .select("mc_name, role")
       .eq("id", currentUser.id)
       .single();
 
-    if (error) {
-      console.error("❌ Fehler beim Laden des Profils:", error);
-      return Promise.resolve();
-    }
-    
-    if (!profileData) {
-      console.error("❌ Kein Profil gefunden für ID:", currentUser.id);
-      return Promise.resolve();
-    }
-    
+    if (error || !profileData) return Promise.resolve();
     profile = profileData;
-    console.log("✅ Profil aus Supabase geladen:", profile);
   }
 
   IS_ADMIN = profile.role === "admin";
 
-  // Navigation aktualisieren
   const navUser = document.getElementById("navUser");
   const navUsername = document.getElementById("navUsername");
   const navAvatar = document.getElementById("navAvatar");
@@ -673,13 +437,9 @@ async function loadProfile() {
     navUsername.innerText = profile.mc_name;
     navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
-    console.log("✅ Navigation aktualisiert (loadProfile):", profile.mc_name);
-  } else {
-    console.error("❌ navUser Element nicht gefunden!");
   }
-}
 
-// Admin-Optionen anzeigen
+  // Admin-Optionen anzeigen
   setTimeout(() => {
     const ausgabeOption = document.getElementById("archiveAusgabeOption");
     if (ausgabeOption) {
@@ -712,45 +472,70 @@ async function loadWeeks() {
 
   select.innerHTML = "";
 
+  // Füge immer die aktuelle Woche hinzu
+  const currentWeekOpt = document.createElement("option");
+  currentWeekOpt.value = CURRENT_WEEK;
+  currentWeekOpt.textContent = CURRENT_WEEK;
+  currentWeekOpt.selected = true;
+  select.appendChild(currentWeekOpt);
+
+  // Füge andere Wochen hinzu (außer die aktuelle Woche)
   weeks.forEach(w => {
-    const opt = document.createElement("option");
-    opt.value = w;
-    opt.textContent = w;
-    if (w === CURRENT_WEEK) opt.selected = true;
-    select.appendChild(opt);
+    if (w !== CURRENT_WEEK) {
+      const opt = document.createElement("option");
+      opt.value = w;
+      opt.textContent = w;
+      select.appendChild(opt);
+    }
   });
 
-  SELECTED_WEEK = select.value || CURRENT_WEEK; // Immer CURRENT_WEEK als Fallback verwenden
+  SELECTED_WEEK = CURRENT_WEEK; // Immer aktuelle Woche als Standard
 
   if (wrapper) {
-    wrapper.style.display = weeks.length > 1 ? "flex" : "none";
+    wrapper.style.display = "flex"; // Immer anzeigen
   }
 }
 
 // KASSE / ZAHLEN
 async function loadPaymentsFromDB() {
-  const { data: payments, error } = await window.supabaseClient
+  // Lade alle Zahlungen bis zur aktuellen Woche für Gesamtbilanz
+  const { data: allPayments, error: allError } = await window.supabaseClient
+    .from("payments")
+    .select("type, amount, week")
+    .lte("week", CURRENT_WEEK); // Alle Wochen bis einschließlich aktuelle Woche
+
+  // Lade Zahlungen der ausgewählten Woche für Anzeige
+  const { data: weekPayments, error: weekError } = await window.supabaseClient
     .from("payments")
     .select("type, amount")
     .eq("week", SELECTED_WEEK || CURRENT_WEEK);
 
-  if (error) return;
+  if (allError || weekError) return;
 
-  let beitrag = 0, spende = 0, ausgabe = 0;
-
-  payments.forEach(p => {
-    if (p.type === "beitrag") beitrag += p.amount;
-    if (p.type === "spende") spende += p.amount;
-    if (p.type === "ausgabe") ausgabe += p.amount;
+  // Berechne Gesamtbilanz über alle Wochen
+  let totalBeitrag = 0, totalSpende = 0, totalAusgabe = 0;
+  allPayments.forEach(p => {
+    if (p.type === "beitrag") totalBeitrag += p.amount;
+    if (p.type === "spende") totalSpende += p.amount;
+    if (p.type === "ausgabe") totalAusgabe += p.amount;
   });
 
-  const income = beitrag + spende;
-  // Kontostand aus der Datenbank berechnen (nicht nur START_BALANCE)
-  const balance = START_BALANCE + income - ausgabe;
+  // Berechne Werte der ausgewählten Woche
+  let weekBeitrag = 0, weekSpende = 0, weekAusgabe = 0;
+  weekPayments.forEach(p => {
+    if (p.type === "beitrag") weekBeitrag += p.amount;
+    if (p.type === "spende") weekSpende += p.amount;
+    if (p.type === "ausgabe") weekAusgabe += p.amount;
+  });
 
-  document.getElementById("income").textContent = formatMoney(income);
-  document.getElementById("expenses").textContent = formatMoney(ausgabe);
-  document.getElementById("balance").textContent = formatMoney(balance);
+  const totalIncome = totalBeitrag + totalSpende;
+  const weekIncome = weekBeitrag + weekSpende;
+  const totalBalance = START_BALANCE + totalIncome - totalAusgabe;
+
+  // Zeige Gesamtbilanz und Werte der ausgewählten Woche an
+  document.getElementById("income").textContent = formatMoney(weekIncome);
+  document.getElementById("expenses").textContent = formatMoney(weekAusgabe);
+  document.getElementById("balance").textContent = formatMoney(totalBalance);
 }
 
 // SPIELERSTATUS
@@ -1143,24 +928,19 @@ async function markPlayerAsUnpaid(playerId, playerName) {
 
 // ARCHIV
 async function loadArchive() {
-  console.log("=== DEBUG loadArchive() ===");
-  console.log("SELECTED_WEEK:", SELECTED_WEEK);
-  console.log("CURRENT_WEEK:", CURRENT_WEEK);
-  
-  // Stelle sicher, dass SELECTED_WEEK gesetzt ist
-  if (!SELECTED_WEEK) {
-    SELECTED_WEEK = CURRENT_WEEK;
-    console.log("SELECTED_WEEK war null, gesetzt auf:", SELECTED_WEEK);
-  }
-  
-  console.log("Week Filter:", SELECTED_WEEK && SELECTED_WEEK !== "" ? SELECTED_WEEK : CURRENT_WEEK);
-  
   const el = document.getElementById("archiveList");
   if (!el) return;
 
   const { data, error } = await window.supabaseClient
     .from("payments")
-    .select("id, type, amount, note, created_at, profiles ( mc_name )")
+    .select(`
+      id,
+      type,
+      amount,
+      note,
+      created_at,
+      profiles ( mc_name )
+    `)
     .eq("week", SELECTED_WEEK && SELECTED_WEEK !== "" ? SELECTED_WEEK : CURRENT_WEEK)
     .order("created_at", { ascending: false })
     .limit(15);

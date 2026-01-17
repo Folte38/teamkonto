@@ -10,26 +10,6 @@ document.addEventListener("DOMContentLoaded", async function() {
   } else {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
-    // Navigation initialisieren wie bei index.html
-    const navUser = document.getElementById("navUser");
-    const navUsername = document.getElementById("navUsername");
-    const navAvatar = document.getElementById("navAvatar");
-    
-    if (navUser && navUsername && navAvatar) {
-      const currentUser = await window.getCurrentUser();
-      if (currentUser) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-      }
-    }
-    
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
     initializeApp();
     initializeServerStatus();
     
@@ -53,47 +33,21 @@ function initializeApp() {
 }
 
 // =========================
-// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
+// PROFIL & NAV
 // =========================
 async function loadProfile() {
   const currentUser = await window.getCurrentUser();
-  if (!currentUser) return Promise.resolve();
+  if (!currentUser) return;
 
-  // Für additional_password Methode müssen wir das Profil anders laden
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-  } else {
-    // Supabase Methode - altes Verhalten
-    const { data: profileData, error } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name, role")
-      .eq("id", currentUser.id)
-      .single();
-
-    if (error || !profileData) return Promise.resolve();
-    profile = profileData;
-  }
-
-  // GLOBALE VARIABLEN SETZEN - WICHTIG FÜR API-AUFRUFE
   CURRENT_USER_ID = currentUser.id;
-  CURRENT_MC_NAME = profile.mc_name;
-  IS_ADMIN = profile.role === "admin";
+  CURRENT_MC_NAME = currentUser.mc_name;
+  IS_ADMIN = currentUser.role === "admin";
 
-  console.log("✅ loadProfile(): Globale Variablen gesetzt:", {
-    CURRENT_USER_ID,
-    CURRENT_MC_NAME,
-    IS_ADMIN
-  });
-
-  // Navigation IMMER aktualisieren bei Benutzerwechsel
   const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
   if (navUser) {
-    navUsername.innerText = profile.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    document.getElementById("navUsername").innerText = currentUser.mc_name;
+    document.getElementById("navAvatar").src =
+      `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
     navUser.style.display = "flex";
   }
 }

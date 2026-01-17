@@ -10,26 +10,6 @@ document.addEventListener("DOMContentLoaded", async function() {
   } else {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
-    // Navigation initialisieren wie bei index.html
-    const navUser = document.getElementById("navUser");
-    const navUsername = document.getElementById("navUsername");
-    const navAvatar = document.getElementById("navAvatar");
-    
-    if (navUser && navUsername && navAvatar) {
-      const currentUser = await window.getCurrentUser();
-      if (currentUser) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-        
-        // Session-Change Listener für sofortige Navigation-Updates
-        if (window.setupSessionChangeListener) {
-          window.setupSessionChangeListener();
-        }
-      }
-    }
-    
     initializeApp();
     initializeServerStatus();
     
@@ -143,73 +123,39 @@ async function loadTotalMembers() {
   }
 }
 
-// PROFIL & NAV - KOMPLETT ÜBERARBEITET
+// =========================
+// PROFIL & NAVIGATION
+// =========================
 async function loadProfile() {
-  const currentUser = await window.getCurrentUser();
-  if (!currentUser) return Promise.resolve();
+  try {
+    const currentUser = await window.getCurrentUser();
+    if (!currentUser) return;
 
-  console.log("🔍 loadProfile() currentUser:", currentUser);
+    CURRENT_USER_ID = currentUser.id;
+    CURRENT_MC_NAME = currentUser.mc_name;
 
-  // PROFIL-DIREKT VERWENDEN - keine zusätzliche Datenbankabfragen
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-    console.log("✅ loadProfile(): Additional Password Profil verwendet:", profile.mc_name);
-  } else {
-    // Supabase Methode - currentUser enthält bereits alle Daten
-    profile = {
-      mc_name: currentUser.mc_name,
-      role: currentUser.role
-    };
-    console.log("✅ loadProfile(): Supabase Profil erstellt:", profile.mc_name);
-  }
+    // Navigation anzeigen
+    const navUser = document.getElementById("navUser");
+    if (navUser) {
+      document.getElementById("navUsername").innerText = currentUser.mc_name;
+      document.getElementById("navAvatar").src =
+        "https://mc-heads.net/avatar/" + currentUser.mc_name + "/64";
+      navUser.style.display = "flex";
+    }
 
-  // GLOBALE VARIABLEN SETZEN
-  CURRENT_USER_ID = currentUser.id;
-  CURRENT_MC_NAME = profile.mc_name;
-  IS_ADMIN = profile.role === "admin";
+    // Formular vorausfüllen
+    const creditUser = document.getElementById("creditUser");
+    if (creditUser) {
+      creditUser.value = currentUser.mc_name;
+    }
 
-  // GLOBALE VARIABLEN ALS WINDOW VARIABLEN SETZEN
-  window.CURRENT_USER_ID = currentUser.id;
-  window.CURRENT_MC_NAME = profile.mc_name;
-  window.IS_ADMIN = profile.role === "admin";
-
-  console.log("✅ loadProfile(): Globale Variablen gesetzt:", {
-    CURRENT_USER_ID,
-    CURRENT_MC_NAME,
-    IS_ADMIN
-  });
-
-  console.log("✅ loadProfile(): Window Variablen gesetzt:", {
-    window_CURRENT_USER_ID: window.CURRENT_USER_ID,
-    window_CURRENT_MC_NAME: window.CURRENT_MC_NAME,
-    window_IS_ADMIN: window.IS_ADMIN
-  });
-
-  // Navigation IMMER aktualisieren
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  if (navUser) {
-    navUsername.innerText = profile.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
-    navUser.style.display = "flex";
-    console.log("✅ Navigation aktualisiert (loadProfile):", profile.mc_name);
-  } else {
-    console.error("❌ navUser Element nicht gefunden!");
-  }
-
-  // Formular vorausfüllen
-  const creditUser = document.getElementById("creditUser");
-  if (creditUser) {
-    creditUser.value = profile.mc_name;
-  }
-
-  // Logout-Button anzeigen
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.style.display = "block";
+    // Logout-Button anzeigen
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+      logoutBtn.style.display = "block";
+    }
+  } catch (error) {
+    console.error("Fehler beim Laden des Profils:", error);
   }
 }
 

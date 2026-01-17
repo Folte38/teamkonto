@@ -7,28 +7,10 @@ document.addEventListener("DOMContentLoaded", async function() {
   if (!auth.authenticated) {
     document.getElementById('loginPage').style.display = 'flex';
     document.getElementById('mainContent').style.display = 'none';
-    return;
+  } else {
+    // Eingeloggt - prüfe Admin-Rechte
+    checkAdminAndInitialize();
   }
-
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'block';
-  
-  // Navigation initialisieren wie bei index.html
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-  
-  if (navUser && navUsername && navAvatar) {
-    const currentUser = await window.getCurrentUser();
-    if (currentUser) {
-      navUsername.innerText = currentUser.mc_name;
-      navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-      navUser.style.display = "flex";
-    }
-  }
-  
-  // Eingeloggt - prüfe Admin-Rechte
-  checkAdminAndInitialize();
 });
 
 // =========================
@@ -51,11 +33,6 @@ async function checkAdminAndInitialize() {
     window.IS_ADMIN = currentUser.role === "admin";
     
     // App initialisieren
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
     initializeApp();
     initializeServerStatus();
     
@@ -173,48 +150,23 @@ const STRAFEN = {
 };
 
 // =========================
-// PROFIL & NAV - EXAKTE LOGIK VON INDEX.HTML
+// PROFIL & NAV
 // =========================
 async function loadProfile() {
   const currentUser = await window.getCurrentUser();
-  if (!currentUser) return Promise.resolve();
+  if (!currentUser) return;
 
-  // Für additional_password Methode müssen wir das Profil anders laden
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-  } else {
-    // Supabase Methode - altes Verhalten
-    const { data: profileData, error } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name, role")
-      .eq("id", currentUser.id)
-      .single();
-
-    if (error || !profileData) return Promise.resolve();
-    profile = profileData;
-  }
-
-  // GLOBALE VARIABLEN SETZEN - WICHTIG FÜR API-AUFRUFE
   CURRENT_USER_ID = currentUser.id;
-  CURRENT_MC_NAME = profile.mc_name;
-  IS_ADMIN = profile.role === "admin";
+  CURRENT_MC_NAME = currentUser.mc_name;
+  IS_ADMIN = currentUser.role === "admin";
 
-  console.log("✅ loadProfile(): Globale Variablen gesetzt:", {
-    CURRENT_USER_ID,
-    CURRENT_MC_NAME,
-    IS_ADMIN
-  });
-
-  // Navigation IMMER aktualisieren bei Benutzerwechsel
   const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
   if (navUser) {
-    navUsername.innerText = profile.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
     navUser.style.display = "flex";
+    navUser.innerHTML = `
+      <span id="navUsername">${currentUser.mc_name}</span>
+      <img id="navAvatar" src="https://mc-heads.net/avatar/${currentUser.mc_name}/64" alt="${currentUser.mc_name}">
+    `;
   }
 
   // Logout-Button anzeigen
@@ -902,46 +854,5 @@ document.addEventListener("DOMContentLoaded", function() {
   const logoutBtn = document.getElementById("logoutBtn");
   if (logoutBtn) {
     logoutBtn.addEventListener("click", logout);
-  }
-  
-  // Passwort-Button Event Listener
-  const changePasswordBtn = document.getElementById("changePasswordBtn");
-  if (changePasswordBtn) {
-    changePasswordBtn.addEventListener("click", () => {
-      const modal = document.getElementById("passwordModal");
-      if (modal) {
-        modal.style.display = "flex";
-      }
-    });
-  }
-  
-  // Passwort-Modal Event Listener
-  const passwordModalClose = document.getElementById("passwordModalClose");
-  if (passwordModalClose) {
-    passwordModalClose.addEventListener("click", () => {
-      const modal = document.getElementById("passwordModal");
-      if (modal) {
-        modal.style.display = "none";
-      }
-    });
-  }
-  
-  const passwordCancelBtn = document.getElementById("passwordCancelBtn");
-  if (passwordCancelBtn) {
-    passwordCancelBtn.addEventListener("click", () => {
-      const modal = document.getElementById("passwordModal");
-      if (modal) {
-        modal.style.display = "none";
-      }
-    });
-  }
-  
-  // Passwort-Formular Event Listener
-  const passwordForm = document.getElementById("passwordForm");
-  if (passwordForm) {
-    passwordForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      // Passwort-Änderung wird von password-management.js gehandelt
-    });
   }
 });

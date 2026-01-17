@@ -2,9 +2,6 @@
 // LOGIN CHECK & SEITEN-WECHSEL
 // =========================
 document.addEventListener("DOMContentLoaded", async function() {
-  // Navigation SOFORT anzeigen
-  showNavigation();
-  
   const auth = await window.checkAuthentication();
   
   if (!auth.authenticated) {
@@ -13,12 +10,6 @@ document.addEventListener("DOMContentLoaded", async function() {
   } else {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
     initializeApp();
     initializeServerStatus();
     
@@ -30,69 +21,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
   }
 });
-
-// EINFACHE NAVIGATION - AKTUELLE SESSION DATEN VERWENDEN
-async function showNavigation() {
-  console.log("🔍 showNavigation() aufgerufen");
-  
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
-
-  if (navUser && navUsername && navAvatar) {
-    // AKTUELLE SESSION DATEN LADEN - nicht hartcodiert
-    try {
-      const currentUser = await window.getCurrentUser();
-      if (currentUser && currentUser.mc_name) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit aktuellen Session-Daten angezeigt:", currentUser.mc_name);
-        console.log("✅ MC-Kopf:", navAvatar.src);
-        console.log("✅ Username:", navUsername.innerText);
-        console.log("✅ Display:", navUser.style.display);
-        
-        // Globale Variablen aktualisieren
-        window.CURRENT_USER_ID = currentUser.id;
-        window.CURRENT_MC_NAME = currentUser.mc_name;
-        window.IS_ADMIN = currentUser.role === "admin";
-        
-        return true;
-      }
-    } catch (error) {
-      console.error("❌ Fehler beim Laden der aktuellen Session:", error);
-    }
-    
-    // Fallback: localStorage auslesen
-    const sessionData = localStorage.getItem('currentSession');
-    if (sessionData) {
-      try {
-        const parsed = JSON.parse(sessionData);
-        navUsername.innerText = parsed.mc_name || 'Unbekannt';
-        navAvatar.src = `https://mc-heads.net/avatar/${parsed.mc_name || 'Steve'}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit localStorage Daten angezeigt:", parsed.mc_name);
-        return true;
-      } catch (error) {
-        console.error("❌ Fehler beim Lesen der Session:", error);
-      }
-    }
-    
-    // Letzter Fallback: Gerry237
-    navUsername.innerText = "Gerry237";
-    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
-    navUser.style.display = "flex";
-    console.log("✅ Navigation Fallback angezeigt: Gerry237");
-    
-  } else {
-    console.error("❌ Navigation Elemente nicht gefunden!");
-    return false;
-  }
-}
 
 // =========================
 // SERVER STATUS FUNKTIONEN
@@ -184,61 +112,23 @@ let CURRENT_DATE = new Date();
 let SELECTED_DATE = null;
 let SELECTED_PLAYERS = new Set(); // Set für ausgewählte Spieler
 
-// PROFIL & NAV - KOMPLETT ÜBERARBEITET
+// =========================
+// PROFIL & NAV
+// =========================
 async function loadProfile() {
   const currentUser = await window.getCurrentUser();
-  if (!currentUser) return Promise.resolve();
+  if (!currentUser) return;
 
-  console.log("🔍 loadProfile() currentUser:", currentUser);
-
-  // PROFIL-DIREKT VERWENDEN - keine zusätzliche Datenbankabfragen
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-    console.log("✅ loadProfile(): Additional Password Profil verwendet:", profile.mc_name);
-  } else {
-    // Supabase Methode - currentUser enthält bereits alle Daten
-    profile = {
-      mc_name: currentUser.mc_name,
-      role: currentUser.role
-    };
-    console.log("✅ loadProfile(): Supabase Profil erstellt:", profile.mc_name);
-  }
-
-  // GLOBALE VARIABLEN SETZEN
   CURRENT_USER_ID = currentUser.id;
-  CURRENT_MC_NAME = profile.mc_name;
-  IS_ADMIN = profile.role === "admin";
+  CURRENT_MC_NAME = currentUser.mc_name;
+  IS_ADMIN = currentUser.role === "admin";
 
-  // GLOBALE VARIABLEN ALS WINDOW VARIABLEN SETZEN
-  window.CURRENT_USER_ID = currentUser.id;
-  window.CURRENT_MC_NAME = profile.mc_name;
-  window.IS_ADMIN = profile.role === "admin";
-
-  console.log("✅ loadProfile(): Globale Variablen gesetzt:", {
-    CURRENT_USER_ID,
-    CURRENT_MC_NAME,
-    IS_ADMIN
-  });
-
-  console.log("✅ loadProfile(): Window Variablen gesetzt:", {
-    window_CURRENT_USER_ID: window.CURRENT_USER_ID,
-    window_CURRENT_MC_NAME: window.CURRENT_MC_NAME,
-    window_IS_ADMIN: window.IS_ADMIN
-  });
-
-  // Navigation IMMER aktualisieren
   const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
   if (navUser) {
-    navUsername.innerText = profile.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    document.getElementById("navUsername").innerText = currentUser.mc_name;
+    document.getElementById("navAvatar").src =
+      `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
     navUser.style.display = "flex";
-    console.log("✅ Navigation aktualisiert (loadProfile):", profile.mc_name);
-  } else {
-    console.error("❌ navUser Element nicht gefunden!");
   }
 }
 
@@ -420,15 +310,6 @@ async function openPlayerModal(date, dayElement) {
   const playerGrid = document.getElementById('playerGrid');
   const noteInput = document.getElementById('dayNote');
   const selectedPlayersList = document.getElementById('selectedPlayersList');
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  if (navUser) {
-    navUsername.innerText = currentUser.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-    navUser.style.display = "flex";
-  }
   
   modalTitle.textContent = formatDateDisplay(date);
   
@@ -620,26 +501,6 @@ function setupEventListeners() {
     }
   });
 }
-
-// Navigation initialisieren
-document.addEventListener("DOMContentLoaded", async function() {
-  // Bestehende Initialisierung
-  const auth = await window.checkAuthentication();
-  
-  if (!auth.authenticated) {
-    document.getElementById('loginPage').style.display = 'flex';
-    document.getElementById('mainContent').style.display = 'none';
-    return;
-  }
-
-  document.getElementById('loginPage').style.display = 'none';
-  document.getElementById('mainContent').style.display = 'block';
-  
-  // Navigation initialisieren
-  if (typeof setupAuth === 'function') {
-    await setupAuth();
-  }
-});
 
 // =========================
 // KALENDER DATENBANK OPERATIONEN

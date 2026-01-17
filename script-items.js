@@ -1,7 +1,7 @@
+// =========================
+// LOGIN CHECK & SEITEN-WECHSEL
+// =========================
 document.addEventListener("DOMContentLoaded", async function() {
-  // Navigation SOFORT anzeigen
-  showNavigation();
-  
   const auth = await window.checkAuthentication();
   
   if (!auth.authenticated) {
@@ -10,12 +10,6 @@ document.addEventListener("DOMContentLoaded", async function() {
   } else {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
     initializeApp();
     initializeServerStatus();
     
@@ -27,129 +21,6 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
   }
 });
-
-// EINFACHE NAVIGATION - AKTUELLE SESSION DATEN VERWENDEN
-async function showNavigation() {
-  console.log("🔍 showNavigation() aufgerufen");
-  
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
-
-  if (navUser && navUsername && navAvatar) {
-    // AKTUELLE SESSION DATEN LADEN - nicht hartcodiert
-    try {
-      const currentUser = await window.getCurrentUser();
-      if (currentUser && currentUser.mc_name) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit aktuellen Session-Daten angezeigt:", currentUser.mc_name);
-        console.log("✅ MC-Kopf:", navAvatar.src);
-        console.log("✅ Username:", navUsername.innerText);
-        console.log("✅ Display:", navUser.style.display);
-        
-        // Globale Variablen aktualisieren
-        window.CURRENT_USER_ID = currentUser.id;
-        window.CURRENT_MC_NAME = currentUser.mc_name;
-        window.IS_ADMIN = currentUser.role === "admin";
-        
-        return true;
-      }
-    } catch (error) {
-      console.error("❌ Fehler beim Laden der aktuellen Session:", error);
-    }
-    
-    // Fallback: localStorage auslesen
-    const sessionData = localStorage.getItem('currentSession');
-    if (sessionData) {
-      try {
-        const parsed = JSON.parse(sessionData);
-        navUsername.innerText = parsed.mc_name || 'Unbekannt';
-        navAvatar.src = `https://mc-heads.net/avatar/${parsed.mc_name || 'Steve'}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit localStorage Daten angezeigt:", parsed.mc_name);
-        return true;
-      } catch (error) {
-        console.error("❌ Fehler beim Lesen der Session:", error);
-      }
-    }
-    
-    // Letzter Fallback: Gerry237
-    navUsername.innerText = "Gerry237";
-    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
-    navUser.style.display = "flex";
-    console.log("✅ Navigation Fallback angezeigt: Gerry237");
-    
-  } else {
-    console.error("❌ Navigation Elemente nicht gefunden!");
-    return false;
-  }
-}
-
-// SESSION-CHANGE LISTENER - Navigation sofort aktualisieren
-function setupSessionChangeListener() {
-  // Überwache Auth-Änderungen alle 2 Sekunden
-  setInterval(async () => {
-    try {
-      const auth = await window.checkAuthentication();
-      const currentUser = await window.getCurrentUser();
-      
-      if (auth.authenticated && currentUser) {
-        // Navigation sofort aktualisieren
-        await updateNavigationImmediate(currentUser);
-      }
-    } catch (error) {
-      console.error("Session-Check Fehler:", error);
-    }
-  }, 2000);
-}
-
-// Navigation sofort aktualisieren
-async function updateNavigationImmediate(currentUser) {
-  // Für additional_password Methode müssen wir das Profil anders laden
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-  } else {
-    // Supabase Methode - altes Verhalten
-    const { data: profileData, error } = await window.supabaseClient
-      .from("profiles")
-      .select("mc_name, role")
-      .eq("id", currentUser.id)
-      .single();
-
-    if (error || !profileData) return;
-    profile = profileData;
-  }
-
-  // Navigation sofort aktualisieren
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  if (navUser && navUsername && navAvatar) {
-    const currentName = navUsername.innerText;
-    const newName = profile.mc_name;
-    
-    // Nur aktualisieren wenn sich der Name geändert hat
-    if (currentName !== newName) {
-      console.log(`🔄 Navigation aktualisiert: ${currentName} → ${newName}`);
-      navUsername.innerText = newName;
-      navAvatar.src = `https://mc-heads.net/avatar/${newName}/64`;
-      navUser.style.display = "flex";
-      
-      // Globale Variablen aktualisieren
-      CURRENT_USER_ID = currentUser.id;
-      CURRENT_MC_NAME = newName;
-      IS_ADMIN = profile.role === "admin";
-    }
-  }
-}
 
 // =========================
 // SERVER STATUS FUNKTIONEN
@@ -230,75 +101,38 @@ let ALL_PROFILES = [];
 let AUTH_METHOD = null; // Neue Variable für Auth-Methode
 
 // =========================
-// PROFIL & NAV - KOMPLETT ÜBERARBEITET
+// PROFIL & NAV
+// =========================
 async function loadProfile() {
+  console.log("loadProfile() gestartet");
   const currentUser = await window.getCurrentUser();
-  if (!currentUser) return Promise.resolve();
-
-  console.log("🔍 loadProfile() currentUser:", currentUser);
-
-  // PROFIL-DIREKT VERWENDEN - keine zusätzliche Datenbankabfragen
-  let profile;
-  if (currentUser.method === 'additional_password') {
-    profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-    console.log("✅ loadProfile(): Additional Password Profil verwendet:", profile.mc_name);
-  } else {
-    // Supabase Methode - currentUser enthält bereits alle Daten
-    profile = {
-      mc_name: currentUser.mc_name,
-      role: currentUser.role
-    };
-    console.log("✅ loadProfile(): Supabase Profil erstellt:", profile.mc_name);
+  console.log("currentUser:", currentUser);
+  
+  if (!currentUser) {
+    console.log("Kein currentUser gefunden - loadProfile() wird abgebrochen");
+    return;
   }
 
-  // GLOBALE VARIABLEN SETZEN
   CURRENT_USER_ID = currentUser.id;
-  CURRENT_MC_NAME = profile.mc_name;
-  IS_ADMIN = profile.role === "admin";
-
-  // GLOBALE VARIABLEN ALS WINDOW VARIABLEN SETZEN
-  window.CURRENT_USER_ID = currentUser.id;
-  window.CURRENT_MC_NAME = profile.mc_name;
-  window.IS_ADMIN = profile.role === "admin";
-
-  console.log("✅ loadProfile(): Globale Variablen gesetzt:", {
+  CURRENT_MC_NAME = currentUser.mc_name;
+  IS_ADMIN = currentUser.role === "admin";
+  AUTH_METHOD = currentUser.method; // Auth-Methode speichern
+  
+  console.log("Profile geladen:", {
     CURRENT_USER_ID,
     CURRENT_MC_NAME,
-    IS_ADMIN
+    IS_ADMIN,
+    AUTH_METHOD
   });
 
-  console.log("✅ loadProfile(): Window Variablen gesetzt:", {
-    window_CURRENT_USER_ID: window.CURRENT_USER_ID,
-    window_CURRENT_MC_NAME: window.CURRENT_MC_NAME,
-    window_IS_ADMIN: window.IS_ADMIN
-  });
-
-  // Navigation IMMER aktualisieren
   const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
   if (navUser) {
-    navUsername.innerText = profile.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
+    document.getElementById("navUsername").innerText = currentUser.mc_name;
+    document.getElementById("navAvatar").src =
+      `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
     navUser.style.display = "flex";
-    console.log("✅ Navigation aktualisiert (loadProfile):", profile.mc_name);
-  } else {
-    console.error("❌ navUser Element nicht gefunden!");
   }
-
-  // Formular vorausfüllen
-  const creditUser = document.getElementById("creditUser");
-  if (creditUser) {
-    creditUser.value = profile.mc_name;
-  }
-
-  // Logout-Button anzeigen
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.style.display = "block";
-  }
-} // Hier fehlte eine schließende Klammer
+}
 
 // =========================
 // ALLE PROFILE LADEN
@@ -968,38 +802,18 @@ async function returnAllMyItems() {
     'Ja, zurücklegen',
     'Abbrechen',
     async () => {
-      // Für additional_password Benutzer verwenden wir CURRENT_USER_ID statt auth.uid()
-      if (!CURRENT_USER_ID) return;
+      const { data: { user } } = await window.supabaseClient.auth.getUser();
+      if (!user) return;
 
       await window.supabaseClient
         .from("team_item_usage")
         .delete()
-        .eq("user_id", CURRENT_USER_ID);
+        .eq("user_id", user.id);
 
       loadTeamItems();
       showNotification(`${CURRENT_MC_NAME} hat alle Items zurückgelegt.`, 'success');
     }
   );
-}
-
-// =========================
-// BENACHRICHTIGUNG ANZEIGEN
-// =========================
-function showMessage(text, type) {
-  const modalBody = document.querySelector('#addItemModal .modal-body');
-  if (!modalBody) return;
-  
-  const existingMessage = modalBody.querySelector('.message');
-  if (existingMessage) existingMessage.remove();
-  
-  const message = document.createElement('div');
-  message.className = `message ${type}`;
-  message.textContent = text;
-  
-  const form = document.getElementById('addItemForm');
-  if (form) {
-    form.appendChild(message);
-  }
 }
 
 // BENACHRICHTIGUNG ANZEIGEN

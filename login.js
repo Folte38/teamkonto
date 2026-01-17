@@ -84,11 +84,6 @@ async function login() {
     // 2. Zusätzliches Passwort überprüfen (falls gesetzt)
     if (profile.additional_password && profile.additional_password.trim() !== '') {
       console.log("Prüfe additional_password...");
-      
-      // Vor dem Login alle Session-Daten leren um Cache-Probleme zu vermeiden
-      localStorage.clear();
-      sessionStorage.clear();
-      
       if (profile.additional_password === password) {
         // additional_password stimmt überein - Login mit localStorage
         localStorage.setItem('currentUser', JSON.stringify({
@@ -99,16 +94,6 @@ async function login() {
         }));
         
         console.log("Login erfolgreich mit additional_password!");
-        
-        // Login-Benachrichtigung anzeigen
-        if (window.showTeamNotification) {
-          window.showTeamNotification(
-            profile.mc_name,
-            `${profile.mc_name} hat sich angemeldet.`,
-            'success'
-          );
-        }
-        
         window.location.href = "index.html";
         return;
       }
@@ -137,16 +122,6 @@ async function login() {
 
     // ✅ Erfolgreich mit Supabase eingeloggt
     console.log("Login erfolgreich mit Supabase!");
-    
-    // Login-Benachrichtigung anzeigen
-    if (window.showTeamNotification) {
-      window.showTeamNotification(
-        mcName,
-        `${mcName} hat sich angemeldet.`,
-        'success'
-      );
-    }
-    
     window.location.href = "index.html";
 
   } catch (error) {

@@ -7,61 +7,10 @@ class MarketDashboard {
     this.categories = [];
     this.filteredData = null;
     this.previousPrices = {};
-    this.isSubmitting = false; // Debounce Variable
     this.init();
   }
 
   async init() {
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
-    // Exakte Logik von index.html
-    const currentUser = await window.getCurrentUser();
-    if (!currentUser) return Promise.resolve();
-
-    // Für additional_password Methode müssen wir das Profil anders laden
-    let profile;
-    if (currentUser.method === 'additional_password') {
-      profile = currentUser; // Profil ist bereits in getCurrentUser geladen
-    } else {
-      // Supabase Methode - altes Verhalten
-      const { data: profileData, error } = await window.supabaseClient
-        .from("profiles")
-        .select("mc_name, role")
-        .eq("id", currentUser.id)
-        .single();
-
-      if (error || !profileData) return Promise.resolve();
-      profile = profileData;
-    }
-
-    // GLOBALE VARIABLEN ALS WINDOW VARIABLEN SETZEN - FÜR ALLE SEITEN SICHTBAR
-    window.CURRENT_USER_ID = currentUser.id;
-    window.CURRENT_MC_NAME = profile.mc_name;
-    window.IS_ADMIN = profile.role === "admin";
-
-    console.log("✅ setupAuth(): Window Variablen gesetzt:", {
-      window_CURRENT_USER_ID: window.CURRENT_USER_ID,
-      window_CURRENT_MC_NAME: window.CURRENT_MC_NAME,
-      window_IS_ADMIN: window.IS_ADMIN
-    });
-
-    // Navigation IMMER aktualisieren - keine Bedingungen
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  if (navUser) {
-    navUsername.innerText = profile.mc_name;
-    navAvatar.src = `https://mc-heads.net/avatar/${profile.mc_name}/64`;
-    navUser.style.display = "flex";
-    console.log("✅ Navigation initialisiert (setupAuth):", profile.mc_name);
-  } else {
-    console.error("❌ navUser Element nicht gefunden!");
-  }
-    
     await this.setupAuth();
     await this.loadMarketData();
     this.setupEventListeners();
@@ -81,13 +30,24 @@ class MarketDashboard {
     document.getElementById('loginPage').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
     
-    // Navigation Setup - bereits in init() gemacht, hier überspringen
-    // Die Navigation wird bereits korrekt in init() initialisiert
+    // Navigation Setup
+    const currentUser = await window.getCurrentUser();
+    if (currentUser) {
+      const navUser = document.getElementById("navUser");
+      const navUsername = document.getElementById("navUsername");
+      const navAvatar = document.getElementById("navAvatar");
+
+      if (navUser && navUsername && navAvatar) {
+        navUsername.innerText = currentUser.mc_name;
+        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
+        navUser.style.display = "flex";
+      }
+    }
   }
 
   async loadMarketData() {
     try {
-      console.log(" Lade Marktdaten...");
+      console.log("🔄 Lade Marktdaten...");
       
       // Lade Kategorien
       const categoriesResponse = await fetch('https://api.opsucht.net/market/categories');
@@ -856,14 +816,6 @@ class MarketDashboard {
   }
 
   async handleItemEntry() {
-    // Debounce-Schutz gegen doppelte Einträge
-    if (this.isSubmitting) {
-      console.log('⚠️ Eintrag wird bereits verarbeitet - ignoriere doppelten Klick');
-      return;
-    }
-    
-    this.isSubmitting = true;
-    
     const playerSelect = document.getElementById('playerSelect');
     const playerName = playerSelect.value.trim();
     const amount = parseInt(document.getElementById('itemAmount').value);
@@ -873,7 +825,6 @@ class MarketDashboard {
     
     if (!playerName || !amount) {
       this.showNotification('Bitte Spieler auswählen und Menge eingeben', 'error');
-      this.isSubmitting = false;
       return;
     }
     
@@ -894,7 +845,6 @@ class MarketDashboard {
       if (insertError) {
         console.error('Fehler beim Einfügen:', insertError);
         this.showNotification('Fehler beim Speichern in der Datenbank', 'error');
-        this.isSubmitting = false;
         return;
       }
 
@@ -916,21 +866,13 @@ class MarketDashboard {
       // 3. Haupt-Grid aktualisieren (für MC-Heads)
       await this.renderItems();
       
-      // 4. Modal schließen um doppelte Einträge zu verhindern
-      const modalOverlay = document.getElementById('itemDetailsModal');
-      if (modalOverlay) {
-        modalOverlay.style.display = 'none';
-      }
-      
-      // 5. Submit-Flag zurücksetzen
-      this.isSubmitting = false;
+      // 4. Modal NICHT schließen, damit man die Änderungen sieht
       
       console.log('🔄 LIVE-UPDATES: Alle Ansichten aktualisiert!');
 
     } catch (error) {
       console.error('Fehler beim Eintragen:', error);
       this.showNotification('Fehler beim Eintragen', 'error');
-      this.isSubmitting = false; // Reset bei Fehler
     }
   }
 
@@ -1015,100 +957,6 @@ class MarketDashboard {
         countText.textContent = '?';
         break;
     }
-  }
-}
-
-// Navigation initialisieren
-document.addEventListener("DOMContentLoaded", async function() {
-  // Navigation SOFORT anzeigen
-  showNavigation();
-  
-  const auth = await window.checkAuthentication();
-  
-  if (!auth.authenticated) {
-    document.getElementById('loginPage').style.display = 'flex';
-    document.getElementById('mainContent').style.display = 'none';
-  } else {
-    document.getElementById('loginPage').style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-    
-    // Session-Change Listener für sofortige Navigation-Updates
-    if (window.setupSessionChangeListener) {
-      window.setupSessionChangeListener();
-    }
-    
-    initializeApp();
-    initializeServerStatus();
-    
-    // Login-Benachrichtigung prüfen (einmalig pro Session)
-    if (window.checkAndSendLoginNotification) {
-      setTimeout(() => {
-        window.checkAndSendLoginNotification();
-      }, 1000);
-    }
-  }
-});
-
-// EINFACHE NAVIGATION - AKTUELLE SESSION DATEN VERWENDEN
-async function showNavigation() {
-  console.log("🔍 showNavigation() aufgerufen");
-  
-  const navUser = document.getElementById("navUser");
-  const navUsername = document.getElementById("navUsername");
-  const navAvatar = document.getElementById("navAvatar");
-
-  console.log("🔍 Navigation Elemente:", { navUser: !!navUser, navUsername: !!navUsername, navAvatar: !!navAvatar });
-
-  if (navUser && navUsername && navAvatar) {
-    // AKTUELLE SESSION DATEN LADEN - nicht hartcodiert
-    try {
-      const currentUser = await window.getCurrentUser();
-      if (currentUser && currentUser.mc_name) {
-        navUsername.innerText = currentUser.mc_name;
-        navAvatar.src = `https://mc-heads.net/avatar/${currentUser.mc_name}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit aktuellen Session-Daten angezeigt:", currentUser.mc_name);
-        console.log("✅ MC-Kopf:", navAvatar.src);
-        console.log("✅ Username:", navUsername.innerText);
-        console.log("✅ Display:", navUser.style.display);
-        
-        // Globale Variablen aktualisieren
-        window.CURRENT_USER_ID = currentUser.id;
-        window.CURRENT_MC_NAME = currentUser.mc_name;
-        window.IS_ADMIN = currentUser.role === "admin";
-        
-        return true;
-      }
-    } catch (error) {
-      console.error("❌ Fehler beim Laden der aktuellen Session:", error);
-    }
-    
-    // Fallback: localStorage auslesen
-    const sessionData = localStorage.getItem('currentSession');
-    if (sessionData) {
-      try {
-        const parsed = JSON.parse(sessionData);
-        navUsername.innerText = parsed.mc_name || 'Unbekannt';
-        navAvatar.src = `https://mc-heads.net/avatar/${parsed.mc_name || 'Steve'}/64`;
-        navUser.style.display = "flex";
-        
-        console.log("✅ Navigation mit localStorage Daten angezeigt:", parsed.mc_name);
-        return true;
-      } catch (error) {
-        console.error("❌ Fehler beim Lesen der Session:", error);
-      }
-    }
-    
-    // Letzter Fallback: Gerry237
-    navUsername.innerText = "Gerry237";
-    navAvatar.src = "https://mc-heads.net/avatar/Gerry237/64";
-    navUser.style.display = "flex";
-    console.log("✅ Navigation Fallback angezeigt: Gerry237");
-    
-  } else {
-    console.error("❌ Navigation Elemente nicht gefunden!");
-    return false;
   }
 }
 
